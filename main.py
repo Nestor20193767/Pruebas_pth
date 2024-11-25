@@ -14,9 +14,9 @@ def display_model_summary(model):
     model_name = model.graph.name if model.graph.name else "Sin nombre"
 
 st.title("Visualizador de Modelos (.h5 y .keras)")
-    # Extraer información de entradas y salidas
-    inputs = [{"name": inp.name, "type": inp.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in inp.type.tensor_type.shape.dim]} for inp in model.graph.input]
-    outputs = [{"name": out.name, "type": out.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in out.type.tensor_type.shape.dim]} for out in model.graph.output]
+# Extraer información de entradas y salidas
+inputs = [{"name": inp.name, "type": inp.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in inp.type.tensor_type.shape.dim]} for inp in model.graph.input]
+outputs = [{"name": out.name, "type": out.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in out.type.tensor_type.shape.dim]} for out in model.graph.output]
 
 # Permitir al usuario cargar un archivo .h5 o .keras
 uploaded_file = st.file_uploader("Sube tu archivo de modelo (.h5 o .keras)", type=["h5", "keras"])
