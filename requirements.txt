@@ -4,3 +4,4 @@ Pillow>=8.0.0  # Para trabajar con imágenes (opcional)
 scipy>=1.5.4  # Opcional para funciones adicionales
 onnx>=1.14.0
 protobuf>=3.20.0,<4
+torch==2.1.0
