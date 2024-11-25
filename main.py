@@ -8,10 +8,10 @@ def display_model_summary(model):
     model.summary(print_fn=lambda x: summary_list.append(x))
     return "\n".join(summary_list)
 
-st.title("Visualizador de Modelos H5")
+st.title("Visualizador de Modelos (.h5 y .keras)")
 
-# Permitir al usuario cargar un archivo .h5
-uploaded_file = st.file_uploader("Sube tu archivo de modelo (.h5)", type=["h5"])
+# Permitir al usuario cargar un archivo .h5 o .keras
+uploaded_file = st.file_uploader("Sube tu archivo de modelo (.h5 o .keras)", type=["h5", "keras"])
 
 if uploaded_file:
     try:
@@ -37,4 +37,3 @@ if uploaded_file:
         st.json(model.to_json())
     except Exception as e:
         st.error(f"Error al cargar el modelo: {e}")
-
