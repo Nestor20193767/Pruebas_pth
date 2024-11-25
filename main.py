@@ -1,5 +1,6 @@
 import streamlit as st
 import tensorflow as tf
+import tempfile
 
 def display_model_summary(model):
     """Convierte el resumen del modelo en texto para mostrarlo en Streamlit."""
@@ -14,9 +15,14 @@ uploaded_file = st.file_uploader("Sube tu archivo de modelo (.h5)", type=["h5"])
 
 if uploaded_file:
     try:
-        # Cargar el modelo directamente desde el archivo subido
+        # Crear un archivo temporal para guardar el archivo subido
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file.write(uploaded_file.read())
+            temp_file_path = temp_file.name
+
+        # Cargar el modelo desde el archivo temporal
         with st.spinner("Cargando el modelo..."):
-            model = tf.keras.models.load_model(uploaded_file)
+            model = tf.keras.models.load_model(temp_file_path)
 
         # Mostrar un mensaje de éxito
         st.success("Modelo cargado con éxito!")
@@ -31,3 +37,4 @@ if uploaded_file:
         st.json(model.to_json())
     except Exception as e:
         st.error(f"Error al cargar el modelo: {e}")
+
