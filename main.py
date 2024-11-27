@@ -6,9 +6,12 @@ from PIL import Image
 import numpy as np
 import tempfile
 
-def preprocess_image(image, input_shape):
+def preprocess_image(image, input_shape, resize_to_256):
     """Redimensiona y normaliza la imagen según la entrada esperada del modelo."""
-    image = image.resize((input_shape[2], input_shape[3]))
+    if resize_to_256:
+        image = image.resize((256, 256))  # Redimensionar a 256x256 si está activado
+    else:
+        image = image.resize((input_shape[2], input_shape[3]))  # Dimensiones del modelo
     image_array = np.array(image).astype("float32") / 255.0  # Normalizar entre 0 y 1
     if len(input_shape) == 4 and input_shape[1] == 3:  # RGB
         image_array = np.transpose(image_array, (2, 0, 1))  # HWC -> CHW
@@ -28,6 +31,9 @@ uploaded_model = st.file_uploader("Sube tu modelo ONNX", type=["onnx"])
 
 # Permitir al usuario cargar una imagen
 uploaded_image = st.file_uploader("Sube una imagen", type=["jpg", "jpeg", "png"])
+
+# Control para redimensionar la imagen a 256x256
+resize_to_256 = st.checkbox("Redimensionar la imagen a 256x256 antes del procesamiento", value=True)
 
 if uploaded_model and uploaded_image:
     try:
@@ -52,8 +58,8 @@ if uploaded_model and uploaded_image:
         input_name = session.get_inputs()[0].name
         input_shape = session.get_inputs()[0].shape
 
-        # Preprocesar la imagen
-        image_tensor = preprocess_image(input_image, input_shape)
+        # Preprocesar la imagen con opción de redimensionar
+        image_tensor = preprocess_image(input_image, input_shape, resize_to_256)
 
         # Ejecutar el modelo
         with st.spinner("Procesando la imagen..."):
@@ -65,3 +71,4 @@ if uploaded_model and uploaded_image:
 
     except Exception as e:
         st.error(f"Error al procesar: {e}")
+
