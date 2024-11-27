@@ -26,7 +26,7 @@ def postprocess_output(output_tensor):
     output_image = np.clip(output_image * 255.0, 0, 255).astype("uint8")  # Desnormalizar
     return Image.fromarray(output_image)
 
-st.title("Procesador de Imágenes con ONNX")
+st.title("Procesador de Imágenes con ONNX :)")
 
 # Permitir al usuario cargar un modelo ONNX
 uploaded_model = st.file_uploader("Sube tu modelo ONNX", type=["onnx"])
