@@ -1,51 +1,67 @@
 import streamlit as st
 import onnx
 from onnx import numpy_helper
+import onnxruntime as ort
+from PIL import Image
+import numpy as np
 import tempfile
 
-def display_model_summary(model):
-    """Extrae y formatea información clave de un modelo ONNX."""
-    # Obtener el nombre del modelo
-    model_name = model.graph.name if model.graph.name else "Sin nombre"
+def preprocess_image(image, input_shape):
+    """Redimensiona y normaliza la imagen según la entrada esperada del modelo."""
+    image = image.resize((input_shape[2], input_shape[3]))
+    image_array = np.array(image).astype("float32") / 255.0  # Normalizar entre 0 y 1
+    if len(input_shape) == 4 and input_shape[1] == 3:  # RGB
+        image_array = np.transpose(image_array, (2, 0, 1))  # HWC -> CHW
+    image_array = np.expand_dims(image_array, axis=0)  # Agregar batch size
+    return image_array
 
-    # Extraer información de entradas y salidas
-    inputs = [{"name": inp.name, "type": inp.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in inp.type.tensor_type.shape.dim]} for inp in model.graph.input]
-    outputs = [{"name": out.name, "type": out.type.tensor_type.elem_type, "shape": [dim.dim_value for dim in out.type.tensor_type.shape.dim]} for out in model.graph.output]
+def postprocess_output(output_tensor):
+    """Convierte el tensor de salida en una imagen."""
+    output_image = output_tensor.squeeze()  # Eliminar dimensiones adicionales
+    output_image = np.clip(output_image * 255.0, 0, 255).astype("uint8")  # Desnormalizar
+    return Image.fromarray(output_image)
 
-    return model_name, inputs, outputs
+st.title("Procesador de Imágenes con ONNX")
 
-st.title("Visualizador de Modelos ONNX")
+# Permitir al usuario cargar un modelo ONNX
+uploaded_model = st.file_uploader("Sube tu modelo ONNX", type=["onnx"])
 
-# Permitir al usuario cargar un archivo .onnx
-uploaded_file = st.file_uploader("Sube tu archivo de modelo (.onnx)", type=["onnx"])
+# Permitir al usuario cargar una imagen
+uploaded_image = st.file_uploader("Sube una imagen", type=["jpg", "jpeg", "png"])
 
-if uploaded_file:
+if uploaded_model and uploaded_image:
     try:
-        # Crear un archivo temporal para guardar el archivo subido
+        # Crear un archivo temporal para el modelo
         with tempfile.NamedTemporaryFile(delete=False, suffix=".onnx") as temp_file:
-            temp_file.write(uploaded_file.read())
-            temp_file_path = temp_file.name
+            temp_file.write(uploaded_model.read())
+            temp_model_path = temp_file.name
 
-        # Cargar el modelo desde el archivo temporal
-        with st.spinner("Cargando el modelo..."):
-            onnx_model = onnx.load(temp_file_path)
+        # Cargar el modelo ONNX
+        with st.spinner("Cargando y validando el modelo..."):
+            onnx_model = onnx.load(temp_model_path)
             onnx.checker.check_model(onnx_model)
-
-        # Mostrar un mensaje de éxito
+        
         st.success("Modelo ONNX cargado y validado con éxito!")
 
-        # Mostrar resumen del modelo
-        st.header("Información del Modelo")
-        model_name, inputs, outputs = display_model_summary(onnx_model)
+        # Cargar la imagen
+        input_image = Image.open(uploaded_image)
+        st.image(input_image, caption="Imagen de entrada", use_column_width=True)
 
-        st.subheader("Nombre del Modelo")
-        st.text(model_name)
+        # Obtener dimensiones de entrada del modelo
+        session = ort.InferenceSession(temp_model_path)
+        input_name = session.get_inputs()[0].name
+        input_shape = session.get_inputs()[0].shape
 
-        st.subheader("Entradas")
-        st.json(inputs)
+        # Preprocesar la imagen
+        image_tensor = preprocess_image(input_image, input_shape)
 
-        st.subheader("Salidas")
-        st.json(outputs)
+        # Ejecutar el modelo
+        with st.spinner("Procesando la imagen..."):
+            outputs = session.run(None, {input_name: image_tensor})
+            output_image = postprocess_output(outputs[0])
+
+        # Mostrar la imagen de salida
+        st.image(output_image, caption="Imagen procesada", use_column_width=True)
 
     except Exception as e:
-        st.error(f"Error al cargar el modelo: {e}")  
+        st.error(f"Error al procesar: {e}")
