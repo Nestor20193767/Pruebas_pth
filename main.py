@@ -45,7 +45,7 @@ df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section
 # Configuración del chatbot
 context = f""" 
 You are an assistant that knows about xRay multix Impact C from Siemens. If the user ask about the content of the manual you must show him this table: {df}.You must use 
-the all link, do not cut them. 
+the all link, do not cut them or put "..." for abbreviation in any anwser that you give. 
 You also can to answer a question the links for more information. For example: If you want to kwno more about _____ here are the sections [Title1](url1), [Title2](url2). 
 You have to use the entery link that is in the table. Do not cut it.
 """
