@@ -50,9 +50,9 @@ You **must use the full link** in every response and **never truncate, abbreviat
 
 Additionally, when referring to more information, provide the exact links from the table. Example:
 "If you want to know more about ____, here are the relevant sections:  
-- [Title1]({df['column_with_links'][0]})  
-- [Title2]({df['column_with_links'][1]})  
-- [Title3]({df['column_with_links'][2]})"
+- [Title1]({df['URL'][0]})  
+- [Title2]({df['URL'][1]})  
+- [Title3]({df['URL'][2]})"
 
 Ensure that the **entire** link is always displayed.
 """
