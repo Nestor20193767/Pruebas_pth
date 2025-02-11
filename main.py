@@ -1,75 +1,98 @@
-import streamlit as st
-import onnx
-from onnx import numpy_helper
-import onnxruntime as ort
-from PIL import Image
-import numpy as np
-import tempfile
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
+from openai import OpenAI
+import openai
+import pandas as pd
+    
+    # Variable global requerida
+contenido_simens_multix_impac = {}
+        
+def obtener_enlaces_pagina(url):
+            """Extrae enlaces de una página con manejo de errores"""
+            try:
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                return {
+                    link.text.strip(): urljoin(url, link['href'])
+                    for element in soup.find_all(class_='pdf')
+                    for link in element.find_all('a', href=True)
+                    if link.text.strip()
+                }
+                
+            except Exception as e:
+                st.error(f"Error en {url}: {str(e)}")
+                return {}
+        
+def proceso_secuencial():
+            """Versión secuencial para 7 páginas"""
+            global contenido_simens_multix_impac
+            
+            base_url = "https://www.manualslib.com/manual/2987225/Siemens-Healthcare-Multix-Impact-C.html"
+            
+            for i in range(1, 8):
+                    url = f"{base_url}?page={i}#manual"
+                    if resultados := obtener_enlaces_pagina(url):
+                        contenido_simens_multix_impac.update(resultados)
+    
+            #return contenido_simens_multix_impac
+proceso_secuencial()
+    
+    # Crear DataFrame
+df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
 
-def preprocess_image(image, input_shape, resize_to_256):
-    """Preprocesa la imagen para modelos de rango 4 o 2."""
-    if len(input_shape) == 4:
-        if resize_to_256:
-            image = image.resize((256, 256))
-        else:
-            image = image.resize((input_shape[2], input_shape[3]))
-        image_array = np.array(image).astype("float32") / 255.0
-        if input_shape[1] == 3:  # Si se esperan 3 canales (RGB)
-            image_array = np.transpose(image_array, (2, 0, 1))  # HWC -> CHW
-        image_array = np.expand_dims(image_array, axis=0)  # Agregar batch size
-    elif len(input_shape) == 2:
-        if resize_to_256:
-            image = image.resize((256, 256))
-        image_array = np.array(image).astype("float32") / 255.0
-        image_array = image_array.flatten()  # Convertir a vector 1D
-        image_array = np.expand_dims(image_array, axis=0)  # Agregar batch size
-    else:
-        raise ValueError(f"Formato de entrada no soportado: {input_shape}")
-    return image_array
-
-def postprocess_output(output_tensor):
-    """Convierte el tensor de salida en una imagen."""
-    output_image = output_tensor.squeeze()
-    output_image = np.clip(output_image * 255.0, 0, 255).astype("uint8")
-    return Image.fromarray(output_image)
-
-st.title("Procesador de Imágenes con ONNX")
-
-uploaded_model = st.file_uploader("Sube tu modelo ONNX", type=["onnx"])
-uploaded_image = st.file_uploader("Sube una imagen", type=["jpg", "jpeg", "png"])
-
-resize_to_256 = st.checkbox("Redimensionar la imagen a 256x256 antes del procesamiento", value=True)
-
-if uploaded_model and uploaded_image:
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".onnx") as temp_file:
-            temp_file.write(uploaded_model.read())
-            temp_model_path = temp_file.name
-
-        with st.spinner("Cargando y validando el modelo..."):
-            session = ort.InferenceSession(temp_model_path)
-            model_inputs = session.get_inputs()
-
-        if not model_inputs:
-            st.error("El modelo no tiene entradas definidas.")
-        else:
-            input_name = model_inputs[0].name
-            input_shape = model_inputs[0].shape
-
-            st.write(f"Dimensiones esperadas de la entrada: {input_shape}")
-
-            input_image = Image.open(uploaded_image)
-            st.image(input_image, caption="Imagen de entrada", use_column_width=True)
-
-            image_tensor = preprocess_image(input_image, input_shape, resize_to_256)
-
-            with st.spinner("Procesando la imagen..."):
-                outputs = session.run(None, {input_name: image_tensor})
-                output_image = postprocess_output(outputs[0])
-
-            st.image(output_image, caption="Imagen procesada", use_column_width=True)
-
-    except Exception as e:
-        st.error(f"Error al procesar: {e}")
-
+context = f""" 
+    You are an assistant called "Kaco". 
+    """
+    
+API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
+API_URL = 'https://api.deepseek.com/chat/completions'
+    
+st.title("DeepSeek Chatbot")
+    
+    # Cliente de OpenAI
+client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
+    
+    # Verificar si ya existe el modelo en el estado de la sesión
+if "deepseek_model" not in st.session_state:
+        st.session_state["deepseek_model"] = "deepseek-chat"
+    
+    # Verificar si ya existe el historial de mensajes
+if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    # Agregar el contexto inicial (mensaje de tipo 'system') al inicio de los mensajes solo en la primera interacción
+if len(st.session_state.messages) == 0:
+        st.session_state.messages.append({
+            "role": "system", 
+            "content": context
+        })
+    
+    # Mostrar solo los mensajes del usuario y del asistente (excluir el mensaje 'system')
+for message in st.session_state.messages:
+        if message["role"] != "system":  # Evitar mostrar el mensaje 'system'
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    
+    # Procesar la entrada del usuario
+if prompt := st.chat_input("What is up?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+    
+    with st.chat_message("assistant"):
+            # Llamada a la API para generar la respuesta
+            stream = client.chat.completions.create(
+                model=st.session_state["deepseek_model"],
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages
+                ],
+                stream=True,
+            )
+            response = st.write_stream(stream)
+            
+        # Añadir la respuesta del asistente al historial de mensajes
+    st.session_state.messages.append({"role": "assistant", "content": response})
 
