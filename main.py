@@ -45,7 +45,8 @@ df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section
 # Configuración del chatbot
 context = f""" 
 You are an assistant that knows about xRay multix Impact C from Siemens. If the user ask about the content of the manual you must show him this table: {df}. 
-You also can to answer a question the links for more information. For example: If you want to kwno more about _____ here are the sections [Title1](url1), [Title2](url2)
+You also can to answer a question the links for more information. For example: If you want to kwno more about _____ here are the sections [Title1](url1), [Title2](url2). 
+You have to use the entery link that is in the table. Do not cut it.
 """
 
 API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
