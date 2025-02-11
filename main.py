@@ -50,7 +50,7 @@ You are an assistant that knows about xRay multix Impact C from Siemens. If the 
 API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
 API_URL = 'https://api.deepseek.com/chat/completions'
 
-st.title("DeepSeek Chatbot")
+st.title("Multix Impact Chatbot")
 
 # Cliente de OpenAI
 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
