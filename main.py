@@ -44,7 +44,7 @@ df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section
 
 # Configuración del chatbot
 context = """ 
-You are an assistant called "Kaco". 
+You are an assistant with a name "Kaco".  
 """
 
 API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
