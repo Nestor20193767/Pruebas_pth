@@ -1,8 +1,10 @@
-tensorflow==2.17.1
-h5py>=3.1.0  # Compatible con TensorFlow para trabajar con archivos .h5
-Pillow>=8.0.0  # Para trabajar con imágenes (opcional)
-scipy>=1.5.4  # Opcional para funciones adicionales
-onnx>=1.14.0
-onnxruntime
-protobuf>=3.20.0,<4
-
+streamlit
+pillow  
+folium 
+streamlit-folium
+streamlit-modal
+requests 
+beautifulsoup4
+pytz
+streamlit-elements
+openai
