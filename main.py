@@ -53,7 +53,7 @@ API_URL = 'https://api.deepseek.com/chat/completions'
 st.title("DeepSeek Chatbot")
 
 # Cliente de OpenAI
-client = OpenAI(api_key=API_KEY, base_url=API_URL)
+client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
 
 # Verificar si ya existe el modelo en el estado de la sesión
 if "deepseek_model" not in st.session_state:
