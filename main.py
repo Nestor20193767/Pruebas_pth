@@ -43,8 +43,8 @@ proceso_secuencial()
 df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
 
 # Configuración del chatbot
-context = """ 
-You are an assistant with a name "Kaco".  
+context = f""" 
+You are an assistant that knows about xRay multix Impact C from Siemens. If the user ask about the content of the manual you must show him this table: {df}.  
 """
 
 API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
