@@ -39,11 +39,11 @@ def proceso_secuencial():
 
 proceso_secuencial()
 
-st.write(contenido_simens_multix_impac)
+#st.write(contenido_simens_multix_impac)
 
 # Crear DataFrame
 df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
-
+st.write(df)
 # Configuración del chatbot
 context = f"""
 You are an assistant that knows about X-Ray Multix Impact C from Siemens. If the user asks about the content of the manual, you must show them this table: {df}. 
