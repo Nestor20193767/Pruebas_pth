@@ -39,6 +39,8 @@ def proceso_secuencial():
 
 proceso_secuencial()
 
+st.write(contenido_simens_multix_impac)
+
 # Crear DataFrame
 df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
 
