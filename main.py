@@ -81,8 +81,8 @@ if prompt := st.chat_input("What is up?"):
         with st.chat_message("user"):
             st.markdown(prompt)
     
-    with st.chat_message("assistant"):
-            # Llamada a la API para generar la respuesta
+        with st.chat_message("assistant"):
+        # Llamada a la API para generar la respuesta
             stream = client.chat.completions.create(
                 model=st.session_state["deepseek_model"],
                 messages=[
@@ -92,7 +92,8 @@ if prompt := st.chat_input("What is up?"):
                 stream=True,
             )
             response = st.write_stream(stream)
+
             
         # Añadir la respuesta del asistente al historial de mensajes
-    st.session_state.messages.append({"role": "assistant", "content": response})
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
