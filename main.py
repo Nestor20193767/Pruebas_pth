@@ -56,7 +56,7 @@ Additionally, when referring to more information, provide the exact links from t
 - [Title2]({df['URL'][1]})  
 - [Title3]({df['URL'][2]})"
 
-Ensure that the **entire** link is always displayed.
+Ensure that the **entire** link is always displayed. DO NOT cut the links when you display it. 
 """
 
 API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
@@ -69,7 +69,7 @@ client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
 
 # Verificar si ya existe el modelo en el estado de la sesión
 if "deepseek_model" not in st.session_state:
-    st.session_state["deepseek_model"] = "deepseek-chat"
+    st.session_state["deepseek_model"] = "deepseek-reasoner" #"deepseek-chat"
 
 # Verificar si ya existe el historial de mensajes
 if "messages" not in st.session_state:
