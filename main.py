@@ -1,109 +1,84 @@
-from urllib.parse import urljoin
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
 import streamlit as st
+import fitz  # PyMuPDF
 from openai import OpenAI
 
-# Variable global requerida
-contenido_simens_multix_impac = {}
-
-def obtener_enlaces_pagina(url):
-    """Extrae enlaces de una página con manejo de errores"""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        return {
-            link.text.strip(): urljoin(url, link['href'])
-            for element in soup.find_all(class_='pdf')
-            for link in element.find_all('a', href=True)
-            if link.text.strip()
-        }
-        
-    except Exception as e:
-        st.error(f"Error en {url}: {str(e)}")
-        return {}
-
-def proceso_secuencial():
-    """Versión secuencial para 7 páginas"""
-    global contenido_simens_multix_impac
-    
-    base_url = "https://www.manualslib.com/manual/2987225/Siemens-Healthcare-Multix-Impact-C.html"
-    
-    for i in range(1, 8):
-        url = f"{base_url}?page={i}#manual"
-        if resultados := obtener_enlaces_pagina(url):
-            contenido_simens_multix_impac.update(resultados)
-
-proceso_secuencial()
-
-#st.write(contenido_simens_multix_impac)
-
-# Crear DataFrame
-df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
-#st.write(df)
-# Configuración del chatbot
-context = f"""
-You are an assistant that knows about X-Ray Multix Impact C from Siemens. If the user asks about the content of the manual, you must show them this table: {df}. 
-
-You **must use the full link** in every response and **never truncate, abbreviate, or replace parts of the URL with "..."**. Each title has a different link, so **never mix them or generalize**.
-
-Additionally, when referring to more information, provide the exact links from the table. Example:
-"If you want to know more about ____, here are the relevant sections:  
-- [Title1]({df['URL'][0]})  
-- [Title2]({df['URL'][1]})  
-- [Title3]({df['URL'][2]})"
-
-Ensure that the **entire** link is always displayed. DO NOT cut the links when you display it. 
-"""
-
-API_KEY = 'sk-d42bd3f0ecf64fc58e3fab37d7fb6694'
-API_URL = 'https://api.deepseek.com/chat/completions'
-
-st.title("Multix Impact Chatbot")
-
-# Cliente de OpenAI
+# -------------------------------
+# CONFIGURACIÓN DEL CLIENTE DEEPSEEK
+# -------------------------------
+API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
 
-# Verificar si ya existe el modelo en el estado de la sesión
-if "deepseek_model" not in st.session_state:
-    st.session_state["deepseek_model"] = "deepseek-chat" # "deepseek-reasoner" 
+# -------------------------------
+# FUNCIÓN PARA EXTRAER TEXTO DEL PDF
+# -------------------------------
+def extraer_texto_pdf(archivo_pdf):
+    documento = fitz.open(stream=archivo_pdf.read(), filetype="pdf")
+    texto = ""
+    for pagina in documento:
+        texto += pagina.get_text()
+    return texto
 
-# Verificar si ya existe el historial de mensajes
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# -------------------------------
+# FUNCIÓN PARA DIVIDIR EL TEXTO EN SECCIONES
+# -------------------------------
+def dividir_secciones(texto, longitud=3000):
+    """Divide el texto en bloques de longitud fija."""
+    return [texto[i:i+longitud] for i in range(0, len(texto), longitud)]
 
-# Agregar el contexto inicial al historial de mensajes solo en la primera interacción
-if len(st.session_state.messages) == 0:
-    st.session_state.messages.append({"role": "system", "content": context})
+# -------------------------------
+# FUNCIÓN PARA CONSULTAR CON DEEPSEEK
+# -------------------------------
+def consultar_deepseek(pregunta, contexto, modelo="deepseek-chat", max_tokens=500):
+    """Consulta el modelo deepseek-chat con la API."""
+    respuesta = client.chat.completions.create(
+        model=modelo,
+        messages=[
+            {"role": "system", "content": "Responde como un experto en equipos médicos."},
+            {"role": "user", "content": f"Contexto:\n{contexto}\n\nPregunta:\n{pregunta}"}
+        ],
+        max_tokens=max_tokens,
+        temperature=0.5
+    )
+    return respuesta.choices[0].message['content'].strip()
 
-# Mostrar los mensajes previos (excepto el mensaje 'system')
-for message in st.session_state.messages:
-    if message["role"] != "system":
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+# -------------------------------
+# INTERFAZ DE STREAMLIT
+# -------------------------------
+st.set_page_config(page_title="Asistente MULTIX Impact C", page_icon="🤖")
 
-# Procesar la entrada del usuario
-if prompt := st.chat_input("What is up?"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+st.title("🤖 Asistente MULTIX Impact C (Deepseek)")
+st.write("Consulta sobre el equipo de radiografía usando la documentación oficial.")
+
+# Cargar PDF
+archivo_pdf = st.file_uploader("📂 Sube el manual de MULTIX Impact C (.pdf)", type=["pdf"])
+if archivo_pdf is not None:
+    with st.spinner("Extrayendo texto..."):
+        texto = extraer_texto_pdf(archivo_pdf)
+        secciones = dividir_secciones(texto)
+
+    st.success(f"✅ Texto extraído en {len(secciones)} secciones.")
+    st.info("Ahora puedes hacer preguntas usando el contenido del manual.")
+
+    # Entrada de Pregunta
+    pregunta = st.text_input("💬 Haz una pregunta sobre el sistema:")
     
-    with st.chat_message("assistant"):
-        # Llamada a la API para generar la respuesta
-        stream = client.chat.completions.create(
-            model=st.session_state["deepseek_model"],
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            temperature=1.3,
-            stream=True,
-        )
-        response = st.write_stream(stream)
-    
-    # Añadir la respuesta del asistente al historial de mensajes
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    if pregunta:
+        with st.spinner("Consultando a Deepseek..."):
+            respuestas = []
+            for i, sec in enumerate(secciones):
+                respuesta = consultar_deepseek(pregunta, sec)
+                respuestas.append(f"Sección {i+1}:\n{respuesta}\n")
+
+            resultado = "\n\n".join(respuestas)
+            st.subheader("📝 Respuesta:")
+            st.text_area("Resultado", value=resultado, height=400)
+
+            # Guardar Respuesta
+            if st.button("💾 Guardar Respuesta"):
+                with open("respuesta_asistente.txt", "w") as archivo:
+                    archivo.write(resultado)
+                st.success("✅ Respuesta guardada como 'respuesta_asistente.txt'")
+
+else:
+    st.warning("🔺 Esperando que subas el manual en PDF.")
 
