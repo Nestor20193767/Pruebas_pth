@@ -43,7 +43,7 @@ proceso_secuencial()
 
 # Crear DataFrame
 df = pd.DataFrame(list(contenido_simens_multix_impac.items()), columns=["Section Title", "URL"])
-st.write(df)
+#st.write(df)
 # Configuración del chatbot
 context = f"""
 You are an assistant that knows about X-Ray Multix Impact C from Siemens. If the user asks about the content of the manual, you must show them this table: {df}. 
@@ -69,7 +69,7 @@ client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
 
 # Verificar si ya existe el modelo en el estado de la sesión
 if "deepseek_model" not in st.session_state:
-    st.session_state["deepseek_model"] = "deepseek-reasoner" #"deepseek-chat"
+    st.session_state["deepseek_model"] = "deepseek-chat" # "deepseek-reasoner" 
 
 # Verificar si ya existe el historial de mensajes
 if "messages" not in st.session_state:
