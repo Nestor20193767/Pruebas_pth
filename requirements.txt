@@ -8,3 +8,4 @@ beautifulsoup4
 pytz
 streamlit-elements
 openai
+pymupdf
