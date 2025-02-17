@@ -99,6 +99,7 @@ if prompt := st.chat_input("What is up?"):
                 {"role": m["role"], "content": m["content"]}
                 for m in st.session_state.messages
             ],
+            temperature=1.3,
             stream=True,
         )
         response = st.write_stream(stream)
