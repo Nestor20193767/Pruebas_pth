@@ -9,4 +9,4 @@ pytz
 streamlit-elements
 openai
 pymupdf
-google-generative-ai
+google-generativeai
