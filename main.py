@@ -5,7 +5,7 @@ from openai import OpenAI
 # -------------------------------
 # CONFIGURACIÓN DEL CLIENTE DEEPSEEK
 # -------------------------------
-API_KEY = st.secrets["sk-d42bd3f0ecf64fc58e3fab37d7fb6694"]
+API_KEY = "sk-d42bd3f0ecf64fc58e3fab37d7fb6694"
 client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
 
 # -------------------------------
