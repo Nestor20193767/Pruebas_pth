@@ -10,3 +10,6 @@ streamlit-elements
 openai
 pymupdf
 google-generativeai
+PyPDF2 
+faiss-cpu
+sentence-transformers 
