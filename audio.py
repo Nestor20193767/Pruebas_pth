@@ -56,8 +56,8 @@ def text_to_speech(text, language='en-US'):
 tab1, tab2, tab3= st.tabs(["Speech-Text","text-Speech", "Speech Assistant"])
 
 with tab1:
-    st.title("Grabación y Transcripción de Audio con Streamlit")
-    audio_file = st.audio_input("Graba tu audio aquí")
+    st.title("Record  y Transcript of Audio")
+    audio_file = st.audio_input("Record your voice here")
 
     if audio_file is not None:
         st.audio(audio_file, format="audio/wav")
@@ -65,15 +65,15 @@ with tab1:
         text = transcribe_audio(audio_file)  # Llama a la función de transcripción
 
         if text:  # Verifica si la transcripción fue exitosa
-            st.write("Transcripción:")
+            st.write("Transcript:")
             st.write(text)
 
 with tab2:
-    st.title("Texto a Voz con Streamlit y gTTS")
+    st.title("Text to Speech")
 
-    texto_ingresado = st.text_area("Ingresa el texto que quieres convertir a voz:", height=150)
+    texto_ingresado = st.text_area("Text input for voice transcript", height=150)
 
-    if st.button("Generar Audio"):
+    if st.button("Get Audio"):
         if texto_ingresado:
             audio = text_to_speech(texto_ingresado) # Llama a la función de conversión de texto a voz
 
