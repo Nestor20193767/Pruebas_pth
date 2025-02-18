@@ -54,7 +54,8 @@ if uploaded_file:
     model, index = create_embeddings(chunks)
 
 # Assistant Interface
-st.title('Xray Multix Impact C Assistant')
+st.title('🤖 DIVI')
+st.subheader("Powered by GEMINI")
 if 'chunks' in locals():
     audio_file = st.audio_input("Speak your question...")
 
