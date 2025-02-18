@@ -34,36 +34,41 @@ def search_context(model, index, chunks, question, top_k=3):
     distances, indices = index.search(np.array(question_embedding), top_k)
     return "\n\n".join(chunks[i] for i in indices[0])
 
-# 🚀 Streamlit Chat Interface
-st.title('PDF Q&A with Gemini and FAISS')
-uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
+# 🚀 Streamlit App with Sidebar
+st.set_page_config(page_title="PDF Q&A with Gemini", layout="wide")
+
+with st.sidebar:
+    st.header("Upload PDF")
+    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
 
 if uploaded_file:
     with open("uploaded.pdf", "wb") as f:
         f.write(uploaded_file.getbuffer())
     chunks = read_pdf_in_chunks("uploaded.pdf")
     model, index = create_embeddings(chunks)
+    st.sidebar.success("PDF uploaded and embeddings created!")
 
-    st.chat_message("assistant").markdown("**PDF uploaded and embeddings created! Ask a question:**")
-
-    if question := st.chat_input("Your question..."):
+st.title('Chatbot')
+if 'chunks' in locals():
+    if question := st.chat_input("Ask a question based on the uploaded PDF..."):
         with st.chat_message("user"):
             st.markdown(question)
         context = search_context(model, index, chunks, question)
         
-        # Get answer from Gemini
         prompt = f"""
         Relevant document context:
         {context}
-
+        
         Question:
         {question}
-
+        
         Provide a clear answer based on the context.
         """
         model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(contents=prompt)
-        #response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         
         with st.chat_message("assistant"):
             st.markdown(response.text)
+else:
+    st.info("Please upload a PDF to begin chatting.")
+
