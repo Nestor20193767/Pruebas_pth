@@ -124,7 +124,7 @@ with tab3:
 
     st.title('Xray Multix Impact C Assitant')
     if 'chunks' in locals():
-        audio_file = st.audio_input("Speak your question...", format="audio/wav")
+        audio_file = st.audio_input("Speak your question...")
     
         if audio_file:
             question = transcribe_audio(audio_file)
