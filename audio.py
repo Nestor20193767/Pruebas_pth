@@ -121,3 +121,39 @@ with tab3:
             f.write(uploaded_file.getbuffer())
         chunks = read_pdf_in_chunks("uploaded.pdf")
         model, index = create_embeddings(chunks)
+
+    st.title('Xray Multix Impact C Assitant')
+    if 'chunks' in locals():
+        audio_file = st.audio_input("Speak your question...", format="audio/wav")
+    
+        if audio_file:
+            question = transcribe_audio(audio_file)
+    
+            if question:
+                with st.chat_message("user"):
+                    st.markdown(question)
+    
+                context = search_context(model, index, chunks, question)
+    
+                prompt = f"""
+                Your name is Divi, an assitant for medical devices in this case you are helping with the device of the document.
+                Relevant document context:
+                {context}
+    
+                Question:
+                {question}
+    
+                Provide a clear answer based on the context.
+                """
+    
+                model = genai.GenerativeModel("gemini-2.0-flash")
+                response = model.generate_content(contents=prompt)
+
+                st.markdown(response.text)
+
+                audio_response = text_to_speech(response.text)
+                st.audio(audio_response, format='audio/mpeg', autoplay=True)
+
+                b64 = base64.b64encode(audio_response.getvalue()).decode()
+                href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Descargar audio respuesta</a>'
+                st.markdown(href, unsafe_allow_html=True)
