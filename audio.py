@@ -31,7 +31,7 @@ with tab2:
     import io
     import base64
     
-    def texto_a_voz(texto, idioma='es'):
+    def texto_a_voz(texto, idioma='en-US'):
         """Convierte texto a voz y devuelve los bytes del audio en memoria."""
         tts = gTTS(text=texto, lang=idioma)
         # En lugar de guardar en un archivo, usamos BytesIO para mantener el audio en memoria
