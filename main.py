@@ -4,7 +4,7 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 
 # 🚀 Configure Gemini API
 api_key = "AIzaSyAgDe959MVEgOz7Z5WtXgIIRXY-5DA54co"
