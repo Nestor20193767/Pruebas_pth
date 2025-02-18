@@ -4,7 +4,6 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import streamlit as st
-from google.colab import files
 from google import genai
 
 # 🚀 Configure Gemini API
