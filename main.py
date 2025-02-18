@@ -1,84 +1,66 @@
+# 📌 Import necessary libraries
+import PyPDF2
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
 import streamlit as st
-import fitz  # PyMuPDF
-from openai import OpenAI
+from google.colab import files
+from google import genai
 
-# -------------------------------
-# CONFIGURACIÓN DEL CLIENTE DEEPSEEK
-# -------------------------------
-API_KEY = "sk-d42bd3f0ecf64fc58e3fab37d7fb6694"
-client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
+# 🚀 Configure Gemini API
+api_key = "AIzaSyAgDe959MVEgOz7Z5WtXgIIRXY-5DA54co"
+client = genai.Client(api_key=api_key)
 
-# -------------------------------
-# FUNCIÓN PARA EXTRAER TEXTO DEL PDF
-# -------------------------------
-def extraer_texto_pdf(archivo_pdf):
-    documento = fitz.open(stream=archivo_pdf.read(), filetype="pdf")
-    texto = ""
-    for pagina in documento:
-        texto += pagina.get_text()
-    return texto
+# 📝 Function to read the PDF and split into chunks
+def read_pdf_in_chunks(file_name, chunk_size=1000):
+    reader = PyPDF2.PdfReader(file_name)
+    full_text = "".join(page.extract_text() or "" for page in reader.pages)
+    return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
 
-# -------------------------------
-# FUNCIÓN PARA DIVIDIR EL TEXTO EN SECCIONES
-# -------------------------------
-def dividir_secciones(texto, longitud=3000):
-    """Divide el texto en bloques de longitud fija."""
-    return [texto[i:i+longitud] for i in range(0, len(texto), longitud)]
+# ⚙️ Create Embeddings with Sentence-Transformers
+@st.cache_resource
+def create_embeddings(chunks):
+    model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    embeddings = np.array([model.encode(chunk) for chunk in chunks])
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    return model, index
 
-# -------------------------------
-# FUNCIÓN PARA CONSULTAR CON DEEPSEEK
-# -------------------------------
-def consultar_deepseek(pregunta, contexto, modelo="deepseek-chat", max_tokens=500):
-    """Consulta el modelo deepseek-chat con la API."""
-    respuesta = client.chat.completions.create(
-        model=modelo,
-        messages=[
-            {"role": "system", "content": "Responde como un experto en equipos médicos."},
-            {"role": "user", "content": f"Contexto:\n{contexto}\n\nPregunta:\n{pregunta}"}
-        ],
-        max_tokens=max_tokens,
-        temperature=0.5
-    )
-    return respuesta.choices[0].message['content'].strip()
+# 💡 Function to search for relevant context
+def search_context(model, index, chunks, question, top_k=3):
+    question_embedding = model.encode([question])
+    distances, indices = index.search(np.array(question_embedding), top_k)
+    return "\n\n".join(chunks[i] for i in indices[0])
 
-# -------------------------------
-# INTERFAZ DE STREAMLIT
-# -------------------------------
-st.set_page_config(page_title="Asistente MULTIX Impact C", page_icon="🤖")
+# 🚀 Streamlit Chat Interface
+st.title('PDF Q&A with Gemini and FAISS')
+uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
 
-st.title("🤖 Asistente MULTIX Impact C (Deepseek)")
-st.write("Consulta sobre el equipo de radiografía usando la documentación oficial.")
+if uploaded_file:
+    with open("uploaded.pdf", "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    chunks = read_pdf_in_chunks("uploaded.pdf")
+    model, index = create_embeddings(chunks)
 
-# Cargar PDF
-archivo_pdf = st.file_uploader("📂 Sube el manual de MULTIX Impact C (.pdf)", type=["pdf"])
-if archivo_pdf is not None:
-    with st.spinner("Extrayendo texto..."):
-        texto = extraer_texto_pdf(archivo_pdf)
-        secciones = dividir_secciones(texto)
+    st.chat_message("assistant").markdown("**PDF uploaded and embeddings created! Ask a question:**")
 
-    st.success(f"✅ Texto extraído en {len(secciones)} secciones.")
-    st.info("Ahora puedes hacer preguntas usando el contenido del manual.")
+    if question := st.chat_input("Your question..."):
+        with st.chat_message("user"):
+            st.markdown(question)
+        context = search_context(model, index, chunks, question)
+        
+        # Get answer from Gemini
+        prompt = f"""
+        Relevant document context:
+        {context}
 
-    # Entrada de Pregunta
-    pregunta = st.text_input("💬 Haz una pregunta sobre el sistema:")
-    
-    if pregunta:
-        with st.spinner("Consultando a Deepseek..."):
-            respuestas = []
-            for i, sec in enumerate(secciones):
-                respuesta = consultar_deepseek(pregunta, sec)
-                respuestas.append(f"Sección {i+1}:\n{respuesta}\n")
+        Question:
+        {question}
 
-            resultado = "\n\n".join(respuestas)
-            st.subheader("📝 Respuesta:")
-            st.text_area("Resultado", value=resultado, height=400)
-
-            # Guardar Respuesta
-            if st.button("💾 Guardar Respuesta"):
-                with open("respuesta_asistente.txt", "w") as archivo:
-                    archivo.write(resultado)
-                st.success("✅ Respuesta guardada como 'respuesta_asistente.txt'")
-
-else:
-    st.warning("🔺 Esperando que subas el manual en PDF.")
-
+        Provide a clear answer based on the context.
+        """
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        
+        with st.chat_message("assistant"):
+            st.markdown(response.text)
