@@ -90,8 +90,8 @@ with tab2:
         r = sr.Recognizer()
     
         # Convertir los bytes de audio a un archivo de audio temporal
-        with open("audio.wav", "wb") as f:
-            f.write(audio_data)
+        #with open("audio.wav", "wb") as f:
+            #f.write(audio_data)
     
         # Leer el archivo de audio con SpeechRecognition
         with sr.AudioFile("audio.wav") as source:
