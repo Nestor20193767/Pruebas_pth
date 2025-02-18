@@ -61,7 +61,9 @@ if uploaded_file:
 
         Provide a clear answer based on the context.
         """
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(contents=prompt)
+        #response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         
         with st.chat_message("assistant"):
             st.markdown(response.text)
