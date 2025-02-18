@@ -48,7 +48,7 @@ if uploaded_file:
     model, index = create_embeddings(chunks)
     st.sidebar.success("PDF uploaded and embeddings created!")
 
-st.title('Chatbot')
+st.title('Xray Multix Impact C Assitant')
 if 'chunks' in locals():
     if question := st.chat_input("Ask a question based on the uploaded PDF..."):
         with st.chat_message("user"):
