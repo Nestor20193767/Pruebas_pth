@@ -3,7 +3,7 @@ import speech_recognition as sr
 
 st.title("Grabación y Transcripción de Audio con Streamlit")
 
-audio_file = st.audio_input("Graba tu audio aquí", type=["audio/wav"])  # Especifica el tipo de audio
+audio_file = st.audio_input("Graba tu audio aquí")  # Especifica el tipo de audio
 
 if audio_file is not None:
     st.audio(audio_file, format="audio/wav")
