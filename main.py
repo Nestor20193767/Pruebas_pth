@@ -48,29 +48,60 @@ if uploaded_file:
     model, index = create_embeddings(chunks)
     st.sidebar.success("PDF uploaded and embeddings created!")
 
-st.title('Xray Multix Impact C Assitant')
-if 'chunks' in locals():
-    if question := st.chat_input("Ask a question based on the uploaded PDF..."):
-        with st.chat_message("user"):
-            st.markdown(question)
-        context = search_context(model, index, chunks, question)
-        
-        prompt = f"""
-        You are Divi an assitant for medical devices in this case you are helping with the device of the document.
-        Relevant document context:
-        {context}
-        
-        Question:
-        {question}
-        
-        Provide a clear answer based on the context.
-        """
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(contents=prompt)
-        
-        with st.chat_message("assistant"):
+tab1, tab2 = st.tabs(["Chabot","Audio"])
+with tab1:
+    st.title('Xray Multix Impact C Assitant')
+    if 'chunks' in locals():
+        if question := st.chat_input("Ask a question based on the uploaded PDF..."):
+            with st.chat_message("user"):
+                st.markdown(question)
+            context = search_context(model, index, chunks, question)
             
-            st.markdown(response.text)
-else:
-    st.info("Please upload a PDF to begin chatting.")
+            prompt = f"""
+            You are Divi an assitant for medical devices in this case you are helping with the device of the document.
+            Relevant document context:
+            {context}
+            
+            Question:
+            {question}
+            
+            Provide a clear answer based on the context.
+            """
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(contents=prompt)
+            
+            with st.chat_message("assistant"):
+                
+                st.markdown(response.text)
+    else:
+        st.info("Please upload a PDF to begin chatting.")
+        
+with tab2:
+    import io
+    import wave
+    
+    st.title("Grabación de Audio con Streamlit")
+    
+    audio_data = st.audio_input("Graba tu audio aquí")
+    
+    if audio_data is not None:
+        st.audio(audio_data, format="audio/wav")
+    
+        # Reproducir el audio grabado
+        st.subheader("Reproducción del Audio Grabado")
+        st.audio(audio_data, format="audio/wav")
+    
+        # Opcional: guardar el audio en un archivo
+        with open("audio.wav", "wb") as f:
+            f.write(audio_data)
+        st.success("Audio guardado exitosamente.")
+    
+        # Mostrar la opción de descargar el archivo de audio
+        st.subheader("Descargar Audio")
+        st.download_button(
+            label="Descargar Audio",
+            data=audio_data,
+            file_name="audio.wav",
+            mime="audio/wav"
+        )
 
