@@ -1,14 +1,16 @@
 # 📌 Import necessary libraries
-import PyPDF2
+import os
 import faiss
+import PyPDF2
 import numpy as np
-from sentence_transformers import SentenceTransformer
 import streamlit as st
 import google.generativeai as genai
+from sentence_transformers import SentenceTransformer
 
 # 🚀 Configure Gemini API
 api_key = "AIzaSyAgDe959MVEgOz7Z5WtXgIIRXY-5DA54co"
-client = genai.Client(api_key=api_key)
+
+genai.configure(api_key=api_key)
 
 # 📝 Function to read the PDF and split into chunks
 def read_pdf_in_chunks(file_name, chunk_size=1000):
