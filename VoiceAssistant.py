@@ -10,78 +10,81 @@ from gtts import gTTS
 import io
 import base64
 
-# Sidebar for PDF upload and Gemini API key
-with st.sidebar:
-    st.title("Settings")
-    gemini_api_key = st.text_input("Enter Gemini API Key:", type="password")
-    uploaded_pdf = st.file_uploader("Upload PDF Document", type=["pdf"])
+# Sidebar for API Key and PDF upload
+api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
+uploaded_file = st.sidebar.file_uploader("Upload PDF Document", type=["pdf"])
 
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
+genai.configure(api_key=api_key)
 
-    # Function to read and split PDF into chunks
-    def read_pdf_chunks(pdf_file, chunk_size=1000):
-        reader = PyPDF2.PdfReader(pdf_file)
-        full_text = "".join(page.extract_text() or "" for page in reader.pages)
-        return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+# Function to read PDF and split into chunks
+def read_pdf_in_chunks(file_name, chunk_size=1000):
+    reader = PyPDF2.PdfReader(file_name)
+    full_text = "".join(page.extract_text() or "" for page in reader.pages)
+    return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
 
-    # Create embeddings using Sentence-Transformers
-    @st.cache_resource
-    def create_embeddings(chunks):
-        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-        embeddings = np.array([model.encode(chunk) for chunk in chunks])
-        index = faiss.IndexFlatL2(embeddings.shape[1])
-        index.add(embeddings)
-        return model, index
+# Function to create embeddings
+@st.cache_resource
+def create_embeddings(chunks):
+    model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    embeddings = np.array([model.encode(chunk) for chunk in chunks])
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    return model, index
 
-    # Search for relevant context based on the question
-    def search_context(model, index, chunks, query, top_k=3):
-        query_embedding = model.encode([query])
-        distances, indices = index.search(np.array(query_embedding), top_k)
-        return "\n\n".join(chunks[i] for i in indices[0])
+# Search function for context
+def search_context(model, index, chunks, question, top_k=3):
+    question_embedding = model.encode([question])
+    distances, indices = index.search(np.array(question_embedding), top_k)
+    return "\n\n".join(chunks[i] for i in indices[0])
 
-    if uploaded_pdf:
-        pdf_chunks = read_pdf_chunks(uploaded_pdf)
-        embed_model, embed_index = create_embeddings(pdf_chunks)
+# Text-to-speech conversion
+def text_to_speech(text, language='en-US'):
+    tts = gTTS(text=text, lang=language)
+    audio_bytes = io.BytesIO()
+    tts.write_to_fp(audio_bytes)
+    audio_bytes.seek(0)
+    return audio_bytes
 
-        st.title('🤖 DIVI')
-        st.subheader("powerd with GEMINI")
-        user_audio = st.audio_input("Ask your question...")
+# Load and process PDF if uploaded
+if uploaded_file:
+    with open("uploaded.pdf", "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    chunks = read_pdf_in_chunks("uploaded.pdf")
+    model, index = create_embeddings(chunks)
 
-        if user_audio:
-            recognizer = sr.Recognizer()
-            with sr.AudioFile(user_audio) as source:
-                audio_data = recognizer.record(source)
+# Assistant Interface
+st.title('Xray Multix Impact C Assistant')
+if 'chunks' in locals():
+    audio_file = st.audio_input("Speak your question...")
+
+    if audio_file:
+        question = transcribe_audio(audio_file)
+        
+        if question:
+            st.chat_message("user").markdown(question)
             
-            try:
-                user_query = recognizer.recognize_google(audio_data, language="en-US")
-                st.markdown(f"**You asked:** {user_query}")
+            context = search_context(model, index, chunks, question)
+            prompt = f"""
+            Your name is Divi, a medical device assistant.
+            Relevant document context:
+            {context}
+            Question:
+            {question}
+            Provide a clear answer based on the context.
+            """
 
-                document_context = search_context(embed_model, embed_index, pdf_chunks, user_query)
-                
-                prompt = f"""
-                You are Divi, a medical device assistant. Answer the user's question based on the provided document context.
-                
-                Document Context:
-                {document_context}
-                
-                User Question:
-                {user_query}
-                """
-                
-                gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-                response = gemini_model.generate_content(contents=prompt)
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(contents=prompt)
 
-                st.markdown(f"**Divi's Response:** {response.text}")
+            # Remove '*' and replace ':' with new lines before displaying and playing audio
+            cleaned_response = response.text.replace('*', ' ').replace(':', '\n')
+            st.markdown(cleaned_response)
 
-                audio_response = gTTS(text=response.text, lang='en')
-                audio_bytes = io.BytesIO()
-                audio_response.write_to_fp(audio_bytes)
-                audio_bytes.seek(0)
-                st.audio(audio_bytes, format='audio/mpeg', autoplay=True)
-            except Exception as e:
-                st.error(f"Error during transcription or response: {e}")
-    else:
-        st.warning("Please upload a PDF document to continue.")
-else:
-    st.warning("Please enter your Gemini API key.")
+            audio_response = text_to_speech(cleaned_response)
+            st.audio(audio_response, format='audio/mpeg', autoplay=True)
+
+            b64 = base64.b64encode(audio_response.getvalue()).decode()
+            href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
