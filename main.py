@@ -69,7 +69,7 @@ if 'chunks' in locals():
         
         
         with st.chat_message("assistant"):
-            response = model.generate_content_stream(contents=prompt)
+            response = model.generate_content(contents=prompt)
             st.write_stream(response)
 else:
     st.info("Please upload a PDF to begin chatting.")
