@@ -66,11 +66,11 @@ if 'chunks' in locals():
         Provide a clear answer based on the context.
         """
         model = genai.GenerativeModel("gemini-2.0-flash")
-        
+        response = model.generate_content(contents=prompt)
         
         with st.chat_message("assistant"):
-            response = model.generate_content(contents=prompt)
-            st.write_stream(response)
+            
+            st.markdown(response.text)
 else:
     st.info("Please upload a PDF to begin chatting.")
 
