@@ -13,3 +13,4 @@ google-generativeai
 PyPDF2 
 faiss-cpu
 sentence-transformers 
+SpeechRecognition
