@@ -11,15 +11,7 @@ if audio_data is not None:
 
     # Inicializar el reconocedor de voz
     r = sr.Recognizer()
-
-    # Crear un archivo temporal
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
-        temp_audio_file.write(audio_data)
-        temp_audio_path = temp_audio_file.name
-
-    # Leer el archivo de audio con SpeechRecognition
-    with sr.AudioFile(temp_audio_path) as source:
-        audio = r.record(source)
+    audio = r.record(audio_data)
 
     try:
         # Transcribir el audio a texto
@@ -31,6 +23,4 @@ if audio_data is not None:
     except sr.RequestError as e:
         st.error(f"Error al solicitar el servicio de reconocimiento de voz: {e}")
 
-    # Eliminar el archivo temporal
-    import os
-    os.remove(temp_audio_path)
+  
