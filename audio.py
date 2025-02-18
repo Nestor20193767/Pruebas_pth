@@ -1,6 +1,6 @@
 import streamlit as st
 import speech_recognition as sr
-import tempfile
+import io
 
 st.title("Grabación y Transcripción de Audio con Streamlit")
 
@@ -11,16 +11,21 @@ if audio_data is not None:
 
     # Inicializar el reconocedor de voz
     r = sr.Recognizer()
-    audio = r.record(audio_data)
+
+    # Crear un objeto BytesIO a partir de los bytes del audio
+    audio_file = io.BytesIO(audio_data)
+    audio_file.name = "audio.wav"  # Necesario para SpeechRecognition
 
     try:
+        # Leer el audio directamente desde BytesIO
+        with sr.AudioFile(audio_file) as source:
+            audio = r.record(source)
+        
         # Transcribir el audio a texto
-        text = r.recognize_google(audio, language="en-US")  # Especifica el idioma inglés
+        text = r.recognize_google(audio, language="es-ES")  # Cambiado a español
         st.write("Transcripción:")
         st.write(text)
     except sr.UnknownValueError:
         st.error("No se pudo entender el audio")
     except sr.RequestError as e:
-        st.error(f"Error al solicitar el servicio de reconocimiento de voz: {e}")
-
-  
+        st.error(f"Error al conectar con el servicio: {e}")
