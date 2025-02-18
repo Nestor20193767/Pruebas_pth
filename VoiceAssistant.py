@@ -54,8 +54,7 @@ if uploaded_file:
     model, index = create_embeddings(chunks)
 
 # Assistant Interface
-st.title('🤖 DIVI')
-st.subheader("Powered by GEMINI")
+st.title('Xray Multix Impact C Assistant')
 if 'chunks' in locals():
     audio_file = st.audio_input("Speak your question...")
 
@@ -88,4 +87,3 @@ if 'chunks' in locals():
             b64 = base64.b64encode(audio_response.getvalue()).decode()
             href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
             st.markdown(href, unsafe_allow_html=True)
-
