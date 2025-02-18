@@ -1,4 +1,10 @@
+import os
+import faiss
+import PyPDF2
+import numpy as np
 import streamlit as st
+import google.generativeai as genai
+from sentence_transformers import SentenceTransformer
 import speech_recognition as sr
 from gtts import gTTS
 import io
@@ -47,7 +53,7 @@ def text_to_speech(text, language='en-US'):
     audio_bytes.seek(0)
     return audio_bytes
 
-tab1, tab2 = st.tabs(["Speech-Text","text-Speech"])
+tab1, tab2, tab3= st.tabs(["Speech-Text","text-Speech", "Speech Assistant"])
 
 with tab1:
     st.title("Grabación y Transcripción de Audio con Streamlit")
@@ -78,3 +84,40 @@ with tab2:
             st.markdown(href, unsafe_allow_html=True)
         else:
             st.warning("Por favor, ingresa un texto para generar el audio.")
+
+with tab3:
+    # 🚀 Configure Gemini API
+    api_key = "AIzaSyAgDe959MVEgOz7Z5WtXgIIRXY-5DA54co"
+    
+    genai.configure(api_key=api_key)
+    
+    # 📝 Function to read the PDF and split into chunks
+    def read_pdf_in_chunks(file_name, chunk_size=1000):
+        reader = PyPDF2.PdfReader(file_name)
+        full_text = "".join(page.extract_text() or "" for page in reader.pages)
+        return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+    
+    # ⚙️ Create Embeddings with Sentence-Transformers
+    @st.cache_resource
+    def create_embeddings(chunks):
+        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+        embeddings = np.array([model.encode(chunk) for chunk in chunks])
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
+        index.add(embeddings)
+        return model, index
+    
+    # 💡 Function to search for relevant context
+    def search_context(model, index, chunks, question, top_k=3):
+        question_embedding = model.encode([question])
+        distances, indices = index.search(np.array(question_embedding), top_k)
+        return "\n\n".join(chunks[i] for i in indices[0])
+
+    
+    uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
+
+    if uploaded_file:
+        with open("uploaded.pdf", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        chunks = read_pdf_in_chunks("uploaded.pdf")
+        model, index = create_embeddings(chunks)
