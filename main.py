@@ -56,6 +56,7 @@ if 'chunks' in locals():
         context = search_context(model, index, chunks, question)
         
         prompt = f"""
+        You are Divi an assitant for medical devices in this case you are helping with the device of the document.
         Relevant document context:
         {context}
         
