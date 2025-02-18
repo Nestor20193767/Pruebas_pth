@@ -102,8 +102,9 @@ if gemini_key and uploaded_file:
             response = model.generate_content(contents=prompt)
 
             st.markdown(response.text)
-
-            audio_response = text_to_speech(response.text)
+            cleaned_response = response.text.replace('*', ' ').replace(':', '\n')
+            
+            audio_response = text_to_speech(cleaned_response)
             st.audio(audio_response, format='audio/mpeg', autoplay=True)
 
             b64 = base64.b64encode(audio_response.getvalue()).decode()
