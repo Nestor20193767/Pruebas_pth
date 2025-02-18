@@ -49,7 +49,7 @@ with tab2:
             audio = texto_a_voz(texto_ingresado)
     
             # Mostrar el audio en Streamlit
-            st.audio(audio, format='audio/mpeg')  # gTTS genera audio en formato MP3
+            st.audio(audio, format='audio/mpeg', autoplay=True)  # gTTS genera audio en formato MP3
     
             # opción de descarga:
             b64 = base64.b64encode(audio.getvalue()).decode()
