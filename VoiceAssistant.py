@@ -38,7 +38,7 @@ with st.sidebar:
 st.title("🤖 DIVI")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
-st.markdown(f"![Multix Imapct]({multix_impact})")
+st.markdown(f"!({multix_impact})")
 
 if gemini_key and uploaded_file:
     text_question = st.chat_input("Type your question...")
