@@ -21,11 +21,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Sidebar for API key and file upload
+# Sidebar para API key y carga de PDF
 st.sidebar.title("Settings")
 gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
 st.sidebar.markdown("[Get your GEMINI key](https://aistudio.google.com/app/apikey?_gl=1*1a748yk*_ga*MTUyNjgyMjI0NS4xNzQwMTQzOTUx*_ga_P1DBVKWT6V*MTc0MDE0Mzk1MS4xLjAuMTc0MDE0Mzk1MS42MC4wLjE2MTk4ODk4ODY.)")
-
 uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
 
 # Inicializar valores en session_state
@@ -36,7 +35,7 @@ if "talk_to_COOKIE" not in st.session_state:
 if "image_db" not in st.session_state:
     st.session_state.image_db = pd.DataFrame()
 if "images_embedding_content" not in st.session_state:
-    st.session_state.images_embedding_content = {}  # Aquí se almacenarán los embeddings de las imágenes
+    st.session_state.images_embedding_content = {}  # Para almacenar embeddings de imágenes
 
 with st.sidebar:
     COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
@@ -151,6 +150,7 @@ except Exception as e:
 
 if gemini_key and uploaded_file:
     genai.configure(api_key=gemini_key)
+    # Guardar el PDF subido
     with open("uploaded.pdf", "wb") as f:
         f.write(uploaded_file.getbuffer())
         
@@ -163,15 +163,14 @@ if gemini_key and uploaded_file:
     images_info = extract_images_from_pdf(temp_pdf_path)
     if images_info:
         st.session_state.image_db = create_image_database(images_info)
-        # Limpia los archivos temporales de imagen
+        # Eliminar archivos temporales de imagen
         for img_info in images_info:
             os.remove(img_info["path"])
     os.remove(temp_pdf_path)
 
-    # ----------------- NUEVA SECCIÓN: EMBEDDINGS DE IMÁGENES -----------------
+    # ----------------- EMBEDDINGS DE IMÁGENES Y ALMACENAMIENTO -----------------
     if not st.session_state.image_db.empty:
         st.subheader("Búsqueda Semántica de Imágenes")
-        # Generar embeddings para los captions de las imágenes
         image_model = SentenceTransformer("all-MiniLM-L6-v2")
         image_captions = st.session_state.image_db["Caption"].tolist()
         image_embeddings = image_model.encode(image_captions, convert_to_numpy=True)
@@ -182,13 +181,13 @@ if gemini_key and uploaded_file:
         st.session_state.image_model = image_model
         st.session_state.image_index = image_index
         st.session_state.image_captions = image_captions
-        # Guardar los embeddings y captions en una variable para incluirlos en el prompt
+        # Almacenar embeddings y captions para incluir en el prompt
         st.session_state.images_embedding_content = {
             "captions": image_captions,
             "embeddings": image_embeddings.tolist()
         }
         
-        # Sección para buscar imágenes
+        # Entrada para búsqueda de imágenes
         query_img = st.text_input("Escribe una descripción para buscar imágenes:")
         if query_img:
             query_embedding = image_model.encode([query_img], convert_to_numpy=True)
@@ -203,25 +202,27 @@ if gemini_key and uploaded_file:
     chunks = read_pdf_in_chunks("uploaded.pdf")
     model, index = create_embeddings(chunks)
     
+    # Entrada de pregunta: se usa audio o texto según el modo elegido
+    if st.session_state.talk_to_COOKIE:
+        audio_file = st.audio_input("Speak your question...")
+    else:
+        text_question = st.chat_input("Type your question...")
+    
     question = None
-    try:
+    if st.session_state.talk_to_COOKIE:
         if 'audio_file' in locals() and audio_file:
             languages = {"English": "en-US", "Spanish": "es-ES"}
             question = transcribe_audio(audio_file, language=languages[option_language])
-    except Exception as e:
-        pass
-    try:
+    else:
         if 'text_question' in locals() and text_question:
             question = text_question.strip()
-    except Exception as e:
-        pass
 
     with text_box:
         if question:
             st.session_state.chat_history.append(("user", question))
             context = search_context(model, index, chunks, question)
             
-            # Incorporar en el prompt la información de imágenes guardada previamente
+            # Incorporar en el prompt la información de imágenes almacenada
             images_info_text = "\n".join(st.session_state.images_embedding_content["captions"])
             
             prompt = f"""
@@ -244,7 +245,7 @@ if gemini_key and uploaded_file:
             response = model_gen.generate_content(contents=prompt)
             response_text = response.text
 
-            # Limpiar respuesta (remover emojis si se desea)
+            # Limpiar respuesta (opcional: remover emojis)
             emoji_pattern = re.compile("[\U0001F600-\U0001F64F"
                                        "\U0001F300-\U0001F5FF"
                                        "\U0001F680-\U0001F6FF"
