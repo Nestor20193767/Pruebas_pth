@@ -163,10 +163,7 @@ if gemini_key and uploaded_file:
     images_info = extract_images_from_pdf(temp_pdf_path)
     if images_info:
         st.session_state.image_db = create_image_database(images_info)
-        # Eliminar archivos temporales de imagen
-        for img_info in images_info:
-            os.remove(img_info["path"])
-    os.remove(temp_pdf_path)
+        
 
     # ----------------- EMBEDDINGS DE IMÁGENES Y ALMACENAMIENTO -----------------
     if not st.session_state.image_db.empty:
