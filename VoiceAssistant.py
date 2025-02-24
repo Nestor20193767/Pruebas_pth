@@ -38,7 +38,7 @@ with st.sidebar:
 st.title("🤖 DIVI")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
-st.markdown(f"!({multix_impact})")
+st.markdown(f"![Multix Impact]({multix_impact})")
 
 if gemini_key and uploaded_file:
     text_question = st.chat_input("Type your question...")
@@ -155,7 +155,7 @@ if gemini_key and uploaded_file:
             If the section contains images, mention them and use them in your response.
             You can show images using links with this form: ![name](link), here an example:
             
-            ![Multix Impacr]({multix_impact})
+            ![Multix Impact]({multix_impact})
 
             Also this image is how the device is looks like: {multix_impact}
             """
