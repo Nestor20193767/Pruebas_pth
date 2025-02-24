@@ -1,4 +1,5 @@
 import os
+import fitz  # pymupdf
 import faiss
 import PyPDF2
 import numpy as np
@@ -10,15 +11,48 @@ from gtts import gTTS
 import io
 import base64
 
-# Sidebar for API key and file upload
+st.set_page_config(
+    page_title="DIVI",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 st.sidebar.title("Settings")
 gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
 uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
 
+if "divi_voice" not in st.session_state:
+    st.session_state.divi_voice = True
+
+if "talk_to_DIVI" not in st.session_state:
+    st.session_state.talk_to_DIVI = False
+
+with st.sidebar:
+    divi_voice = st.checkbox("DIVI voice", key="divi_voice")
+    talk_to_divi = st.checkbox("Talk to DIVI", key="talk_to_DIVI")
+    option_language = st.radio("DIVI language", ["English", "Spanish"], key="English")
+
 st.title("🤖 DIVI")
 st.subheader("Powered by GEMINI")
+st.write("### Ask a Question Based on the Document")
 
-# Function to transcribe audio to text
+if gemini_key and uploaded_file:
+    text_question = st.chat_input("Type your question...")
+
+    text_box = st.container(height=500)
+    
+    if st.session_state.talk_to_DIVI:
+        audio_file = st.audio_input("Speak your question...")
+
+else:
+    st.info('You need to upload a GEMINI key and a document', icon="ℹ️")
+
+languages = {"English": "en-US", "Spanish": "es-ES"}
+
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
 def transcribe_audio(audio_file, language="en-US"):
     recognizer = sr.Recognizer()
     try:
@@ -26,17 +60,9 @@ def transcribe_audio(audio_file, language="en-US"):
             audio = recognizer.record(source)
         text = recognizer.recognize_google(audio, language=language)
         return text
-    except sr.UnknownValueError:
-        st.error("Could not understand the audio")
-        return None
-    except sr.RequestError as e:
-        st.error(f"Speech recognition service error: {e}")
-        return None
-    except Exception as e:
-        st.error(f"Unexpected error during transcription: {e}")
+    except Exception:
         return None
 
-# Function to convert text to speech
 def text_to_speech(text, language='en-US'):
     tts = gTTS(text=text, lang=language)
     audio_bytes = io.BytesIO()
@@ -44,13 +70,11 @@ def text_to_speech(text, language='en-US'):
     audio_bytes.seek(0)
     return audio_bytes
 
-# Function to extract text from a PDF and split it into chunks
 def read_pdf_in_chunks(file_name, chunk_size=1000):
     reader = PyPDF2.PdfReader(file_name)
     full_text = "".join(page.extract_text() or "" for page in reader.pages)
     return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
 
-# Function to create embeddings for document chunks
 @st.cache_resource
 def create_embeddings(chunks):
     model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
@@ -60,55 +84,96 @@ def create_embeddings(chunks):
     index.add(embeddings)
     return model, index
 
-# Function to retrieve relevant context based on a query
 def search_context(model, index, chunks, question, top_k=3):
     question_embedding = model.encode([question])
     distances, indices = index.search(np.array(question_embedding), top_k)
     return "\n\n".join(chunks[i] for i in indices[0])
 
+def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
+    os.makedirs(output_folder, exist_ok=True)
+    doc = fitz.open(pdf_path)
+    image_paths = {}
+
+    for page_number in range(len(doc)):
+        page = doc[page_number]
+        images = page.get_images(full=True)
+        
+        for img_index, img in enumerate(images):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+            ext = base_image["ext"]
+            image_filename = f"{output_folder}/page_{page_number + 1}_img_{img_index}.{ext}"
+
+            with open(image_filename, "wb") as img_file:
+                img_file.write(image_bytes)
+
+            if page_number + 1 not in image_paths:
+                image_paths[page_number + 1] = []
+            image_paths[page_number + 1].append(image_filename)
+
+    return image_paths
+
 if gemini_key and uploaded_file:
     genai.configure(api_key=gemini_key)
+
     with open("uploaded.pdf", "wb") as f:
         f.write(uploaded_file.getbuffer())
-    
+
     chunks = read_pdf_in_chunks("uploaded.pdf")
     model, index = create_embeddings(chunks)
+    image_paths = extract_images_from_pdf("uploaded.pdf")
 
-    st.write("### Ask a Question Based on the Document")
-    audio_file = st.audio_input("Speak your question...")
-
+    question = None
+    
     if audio_file:
-        question = transcribe_audio(audio_file)
+        question = transcribe_audio(audio_file, language=languages[option_language])
 
+    if text_question:
+        question = text_question.strip()
+
+    with text_box:
         if question:
-            with st.chat_message("user"):
-                st.markdown(question)
-
+            st.session_state.chat_history.append(("user", question))
             context = search_context(model, index, chunks, question)
 
             prompt = f"""
-            Your name is DIVI, a medical device assistant. You are helping with the device described in the document.
-            
+            Your name is DIVI, a medical device assistant that answers in the user's language.
+            You are helping with the device described in the document.
+
             Relevant document context:
             {context}
-            
+
             Question:
             {question}
-            
-            Provide a clear answer based on the document.
+
+            Provide a clear answer based on the document and say in which section and pages the user can find the information that you give them 
+            based on the "table of content" in the document.
+            If the section contains images, mention them and use them in your response.
             """
 
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            response = model.generate_content(contents=prompt)
+            ai_model = genai.GenerativeModel("gemini-2.0-flash")
+            response = ai_model.generate_content(contents=prompt)
+            response_text = response.text.replace('*', ' ').replace(':', '\n')
 
-            st.markdown(response.text)
-            cleaned_response = response.text.replace('*', ' ').replace(':', '\n')
-            
-            audio_response = text_to_speech(cleaned_response)
-            st.audio(audio_response, format='audio/mpeg', autoplay=True)
+            audio_response = text_to_speech(response_text, language=languages[option_language])
+            st.session_state.chat_history.append(("assistant", response_text, audio_response))
 
-            b64 = base64.b64encode(audio_response.getvalue()).decode()
-            href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
-            st.markdown(href, unsafe_allow_html=True)
-else:
-    st.warning("Please enter your Gemini API key and upload a PDF file to continue.")
+            with st.chat_message("user"):
+                st.markdown(question)
+
+            with st.chat_message("assistant"):
+                st.markdown(response_text)
+                
+                if st.session_state.divi_voice:
+                    st.audio(audio_response, format='audio/mpeg', autoplay=True)
+                    b64 = base64.b64encode(audio_response.getvalue()).decode()
+                    href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+
+                # Mostrar imágenes relevantes si hay en la sección
+                for page_number, images in image_paths.items():
+                    if f"page {page_number}" in response_text.lower():
+                        st.write(f"📄 Relevant Images from Page {page_number}:")
+                        for img_path in images:
+                            st.image(img_path, caption=f"Image from Page {page_number}", use_column_width=True)
