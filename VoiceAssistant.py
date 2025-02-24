@@ -153,11 +153,11 @@ if gemini_key and uploaded_file:
             Provide a clear answer based on the document and say in which section and pages the user can find the information that you give them 
             based on the "table of content" in the document.
             If the section contains images, mention them and use them in your response.
-            You can show images using links with this form: ![name](link), here an example:
+            You can show images using links with this form: ![caption](link), here an example:
             
             ![Multix Impact]({multix_impact})
 
-            Also this image is how the device is looks like: {multix_impact}
+            Also If the user ask you how the device looks like show this image: {multix_impact}
             """
 
             ai_model = genai.GenerativeModel("gemini-2.0-flash")
