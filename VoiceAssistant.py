@@ -271,7 +271,7 @@ if gemini_key and uploaded_file:
                 
                 # Obtener el URL de esa fila
                 url_especifico = fila_especifica['URL'].values[0]
-                st.markdown(f"![Hola](url_especifico)")
+                st.markdown(f"![Hola]({url_especifico})")
 
                 if st.session_state.COOKIE_voice:
                     st.audio(audio_response, format='audio/mpeg', autoplay=True)
