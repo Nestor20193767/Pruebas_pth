@@ -10,6 +10,7 @@ import speech_recognition as sr
 from gtts import gTTS
 import io
 import base64
+from PIL import Image
 
 st.set_page_config(
     page_title="DIVI",
