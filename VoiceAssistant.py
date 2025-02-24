@@ -13,6 +13,8 @@ import speech_recognition as sr
 import google.generativeai as genai
 from sentence_transformers import SentenceTransformer
 from tempfile import NamedTemporaryFile
+from PIL import Image
+from io import BytesIO
 
 # Configuración de la página
 st.set_page_config(
@@ -53,13 +55,51 @@ def get_base64_img(img_path):
     return f"data:image/{ext};base64,{b64}"
 
 def create_image_database(images_info):
-    """Crea un DataFrame con las imágenes extraídas."""
+    """Crea un DataFrame con embeddings para imágenes y texto."""
     database = []
+    text_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    
     for img_info in images_info:
+        # Crear caption y URL
         caption = f"Página {img_info['page']} - Imagen {img_info['img_index']}"
         img_url = get_base64_img(img_info["path"])
-        database.append({"Caption": caption, "URL": img_url})
+        
+        # Crear embedding del caption
+        caption_embedding = text_model.encode([caption])[0]
+        
+        # Crear embedding visual (si es necesario)
+        try:
+            # Decodificar imagen desde base64
+            header, encoded = img_url.split(",", 1)
+            image_data = base64.b64decode(encoded)
+            image = Image.open(BytesIO(image_data))
+            
+            # Usar modelo de embeddings visuales (ej: CLIP)
+            # image_model = SentenceTransformer('clip-ViT-B-32')
+            # image_embedding = image_model.encode(image)
+            image_embedding = np.zeros(512)  # Placeholder
+        except Exception as e:
+            image_embedding = np.zeros(512)
+        
+        database.append({
+            "Caption": caption,
+            "URL": img_url,
+            "Text_Embedding": caption_embedding,
+            "Image_Embedding": image_embedding
+        })
+    
     return pd.DataFrame(database)
+
+# Nueva función para crear índice de imágenes
+@st.cache_resource
+def create_image_index(image_db):
+    """Crea índice FAISS para búsqueda de imágenes."""
+    # Usar embeddings de texto por defecto
+    embeddings = np.array(image_db['Text_Embedding'].tolist())
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    return index
 
 # --- Funciones de procesamiento de texto ---
 def read_pdf_in_chunks(file_name, chunk_size=1000):
@@ -79,10 +119,46 @@ def create_embeddings(chunks):
     return model, index
 
 def search_context(model, index, chunks, question, top_k=3):
-    """Busca los fragmentos más relevantes para una pregunta."""
+    """Busca contexto en texto e imágenes."""
+    # Búsqueda en texto
+    text_context = "\n\n".join(get_text_context(model, index, chunks, question, top_k))
+    
+    # Búsqueda en imágenes
+    image_context = get_image_context(question, top_k=2)
+    
+    return f"""
+    Text Context:
+    {text_context}
+    
+    Image Context:
+    {image_context}
+    """
+
+def get_text_context(model, index, chunks, question, top_k=3):
+    """Obtiene fragmentos de texto relevantes."""
     question_embedding = model.encode([question])
     distances, indices = index.search(np.array(question_embedding), top_k)
-    return "\n\n".join(chunks[i] for i in indices[0])
+    return [chunks[i] for i in indices[0]]
+
+def get_image_context(question, top_k=2):
+    """Obtiene imágenes relevantes usando embeddings."""
+    if st.session_state.image_db.empty:
+        return "No images available"
+    
+    # Modelo para embeddings de preguntas
+    text_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    question_embedding = text_model.encode([question])
+    
+    # Buscar en el índice
+    distances, indices = st.session_state.image_index.search(question_embedding, top_k)
+    
+    # Obtener URLs
+    results = []
+    for i in indices[0]:
+        row = st.session_state.image_db.iloc[i]
+        results.append(f"![{row['Caption']}]({row['URL']})")
+    
+    return "\n".join(results)
 
 # --- Funciones de audio ---
 def transcribe_audio(audio_file, language="en-US"):
@@ -122,6 +198,8 @@ if "talk_to_COOKIE" not in st.session_state:
     st.session_state.talk_to_COOKIE = False
 if "image_db" not in st.session_state:
     st.session_state.image_db = pd.DataFrame()
+if "image_index" not in st.session_state:
+    st.session_state.image_index = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
@@ -150,6 +228,7 @@ if gemini_key and uploaded_file:
     images_info = extract_images_from_pdf(temp_pdf_path)
     if images_info:
         st.session_state.image_db = create_image_database(images_info)
+        st.session_state.image_index = create_image_index(st.session_state.image_db)
         # Limpiar archivos temporales
         for img_info in images_info:
             os.remove(img_info["path"])
@@ -229,10 +308,8 @@ if gemini_key and uploaded_file:
         Relevant document context:
         {context}
         
-        Question:
-        {question}
-        
-        Provide a clear answer based on the document and mention the section and pages where the information can be found.
+        Provide a clear answer based on the document and include relevant images using markdown syntax: ![Image Description](URL)
+        Question: {question}
         """
         
         genai.configure(api_key=gemini_key)
