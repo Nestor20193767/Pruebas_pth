@@ -141,7 +141,7 @@ if gemini_key and uploaded_file:
             context = search_context(model, index, chunks, question)
 
             prompt = f"""
-            Your name is COOKIE, a medical device assistant that answers in the user's language.
+            Your name is COOKIE, a medical device assistant that answers in the user's language and in a natrual way (and using emojies).
             You are helping with the device described in the document.
 
             Relevant document context:
