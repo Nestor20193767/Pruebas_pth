@@ -13,7 +13,7 @@ import base64
 from PIL import Image
 
 st.set_page_config(
-    page_title="DIVI",
+    page_title="COOKIE",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,18 +24,18 @@ gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
 uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
 multix_impact = "https://marketing.webassets.siemens-healthineers.com/d168e945589c1618/caf5d5af390f/v/f71be8b1483b/siemens-healthineers_XP_medical-Xray-machine_MULTIX-Impact-E.jpg"
 
-if "divi_voice" not in st.session_state:
-    st.session_state.divi_voice = True
+if "COOKIE_voice" not in st.session_state:
+    st.session_state.COOKIE_voice = True
 
-if "talk_to_DIVI" not in st.session_state:
-    st.session_state.talk_to_DIVI = False
+if "talk_to_COOKIE" not in st.session_state:
+    st.session_state.talk_to_COOKIE = False
 
 with st.sidebar:
-    divi_voice = st.checkbox("DIVI voice", key="divi_voice")
-    talk_to_divi = st.checkbox("Talk to DIVI", key="talk_to_DIVI")
-    option_language = st.radio("DIVI language", ["English", "Spanish"], key="English")
+    COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
+    talk_to_COOKIE = st.checkbox("Talk to COOKIE", key="talk_to_COOKIE")
+    option_language = st.radio("COOKIE language", ["English", "Spanish"], key="English")
 
-st.title("🤖 DIVI")
+st.title("🤖 COOKIE")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
 
@@ -45,7 +45,7 @@ if gemini_key and uploaded_file:
 
     text_box = st.container(height=500)
     
-    if st.session_state.talk_to_DIVI:
+    if st.session_state.talk_to_COOKIE:
         audio_file = st.audio_input("Speak your question...")
 
 else:
@@ -141,7 +141,7 @@ if gemini_key and uploaded_file:
             context = search_context(model, index, chunks, question)
 
             prompt = f"""
-            Your name is DIVI, a medical device assistant that answers in the user's language.
+            Your name is COOKIE, a medical device assistant that answers in the user's language.
             You are helping with the device described in the document.
 
             Relevant document context:
@@ -175,7 +175,7 @@ if gemini_key and uploaded_file:
             with st.chat_message("assistant"):
                 st.markdown(response_text)
                 
-                if st.session_state.divi_voice:
+                if st.session_state.COOKIE_voice:
                     st.audio(audio_response, format='audio/mpeg', autoplay=True)
                     b64 = base64.b64encode(audio_response.getvalue()).decode()
                     href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
