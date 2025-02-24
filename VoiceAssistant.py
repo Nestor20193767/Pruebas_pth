@@ -178,4 +178,6 @@ if gemini_key and uploaded_file:
                     if f"page {page_number}" in response_text.lower():
                         st.write(f"📄 Relevant Images from Page {page_number}:")
                         for img_path in images:
-                            st.image(img_path, caption=f"Image from Page {page_number}", use_column_width=True)
+                            img = Image.open(img_path)
+                            img = img.resize((img.width // 2, img.height // 2))  # Reduce size by 50%
+                            st.image(img, caption=f"Image from Page {page_number}", use_column_width=True)
