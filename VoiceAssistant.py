@@ -230,7 +230,7 @@ if gemini_key and uploaded_file:
             {context}
             
             Relevant images information:
-            {images_info_text}
+            {st.session_state.image_db}
             
             Question:
             {question}
