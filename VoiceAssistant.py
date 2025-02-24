@@ -1,16 +1,52 @@
-import streamlit as st
-import fitz  # PyMuPDF
-import base64
 import os
-import pandas as pd
+import io
+import re
+import fitz
 import faiss
+import base64
+import PyPDF2
 import numpy as np
-from tempfile import NamedTemporaryFile
+from gtts import gTTS
+import pandas as pd
+import streamlit as st
+import speech_recognition as sr
+import google.generativeai as genai
 from sentence_transformers import SentenceTransformer
+from tempfile import NamedTemporaryFile
 
-# Cargar modelo de embeddings
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+st.set_page_config(
+    page_title="COOKIE",
+    page_icon="🍪",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# Sidebar for API key and file upload
+st.sidebar.title("Settings")
+gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
+st.sidebar.markdown("[Get your GEMINI key](https://aistudio.google.com/app/apikey?_gl=1*1a748yk*_ga*MTUyNjgyMjI0NS4xNzQwMTQzOTUx*_ga_P1DBVKWT6V*MTc0MDE0Mzk1MS4xLjAuMTc0MDE0Mzk1MS42MC4wLjE2MTk4ODk4ODY.)")
+
+uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
+
+# Inicializar valores en session_state
+if "COOKIE_voice" not in st.session_state:
+    st.session_state.COOKIE_voice = True 
+if "talk_to_COOKIE" not in st.session_state:
+    st.session_state.talk_to_COOKIE = False
+if "image_db" not in st.session_state:
+    st.session_state.image_db = pd.DataFrame()
+
+with st.sidebar:
+    COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
+    talk_to_COOKIE = st.checkbox("Talk to COOKIE", key="talk_to_COOKIE")
+    option_language = st.radio("COOKIE language", ["English", "Spanish"], key="English")
+    st.write(st.session_state.COOKIE_voice)
+
+st.title("🍪 COOKIE")
+st.subheader("Powered by GEMINI")
+st.write("### Ask a Question Based on the Document")
+
+# Funciones para imágenes
 def extract_images_from_pdf(pdf_path):
     """Extrae imágenes de un PDF y las guarda en archivos temporales."""
     doc = fitz.open(pdf_path)
@@ -32,14 +68,14 @@ def extract_images_from_pdf(pdf_path):
     return image_data
 
 def get_base64_img(img_path):
-    """Convierte una imagen a base64 para mostrarla en HTML."""
+    """Convierte una imagen a formato base64 para mostrarla en HTML."""
     with open(img_path, "rb") as img_file:
         b64 = base64.b64encode(img_file.read()).decode()
     ext = img_path.split('.')[-1]
     return f"data:image/{ext};base64,{b64}"
 
 def create_image_database(images_info):
-    """Crea un dataframe con captions y URLs de imágenes."""
+    """Crea un DataFrame con las imágenes extraídas."""
     database = []
     for img_info in images_info:
         caption = f"Página {img_info['page']} - Imagen {img_info['img_index']}"
@@ -47,57 +83,176 @@ def create_image_database(images_info):
         database.append({"Caption": caption, "URL": img_url})
     return pd.DataFrame(database)
 
-def generate_embeddings(df):
-    """Genera embeddings a partir del dataframe y almacena en FAISS."""
-    captions = df["Caption"].tolist()
-    
-    # Convertir captions en embeddings
-    embeddings = embedding_model.encode(captions, convert_to_numpy=True)
-    
-    # Guardar embeddings en FAISS
-    d = embeddings.shape[1]  # Dimensión de los embeddings
-    index = faiss.IndexFlatL2(d)
+# Funciones de audio y PDF (ya existentes en tu código)
+def transcribe_audio(audio_file, language="en-US"):
+    recognizer = sr.Recognizer()
+    try:
+        with sr.AudioFile(audio_file) as source:
+            audio = recognizer.record(source)
+        text = recognizer.recognize_google(audio, language=language)
+        return text
+    except sr.UnknownValueError:
+        st.error("Could not understand the audio")
+        return None
+    except sr.RequestError as e:
+        st.error(f"Speech recognition service error: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Unexpected error during transcription: {e}")
+        return None
+
+def text_to_speech(text, language='en-US'):
+    tts = gTTS(text=text, lang=language)
+    audio_bytes = io.BytesIO()
+    tts.write_to_fp(audio_bytes)
+    audio_bytes.seek(0)
+    return audio_bytes
+
+def read_pdf_in_chunks(file_name, chunk_size=1000):
+    reader = PyPDF2.PdfReader(file_name)
+    full_text = "".join(page.extract_text() or "" for page in reader.pages)
+    return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+
+@st.cache_resource
+def create_embeddings(chunks):
+    model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    embeddings = np.array([model.encode(chunk) for chunk in chunks])
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
+    return model, index
 
-    return index, captions, embeddings
+def search_context(model, index, chunks, question, top_k=3):
+    question_embedding = model.encode([question])
+    distances, indices = index.search(np.array(question_embedding), top_k)
+    return "\n\n".join(chunks[i] for i in indices[0])
 
-st.title("Extractor de Imágenes desde PDF con Embeddings")
+# Historial del chat
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
 
-uploaded_file = st.file_uploader("Sube un archivo PDF", type=["pdf"])
+text_box = st.container(height=500)
+try:
+    with text_box:
+        for role, message, *audio in st.session_state["chat_history"]:
+            with st.chat_message(role):
+                st.markdown(message)
+                if role == "assistant" and audio:
+                    st.audio(audio[0], format='audio/mpeg', autoplay=True)
+                    b64 = base64.b64encode(audio[0].getvalue()).decode()
+                    href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+except Exception as e:
+    pass
 
-if uploaded_file is not None:
+if gemini_key and uploaded_file:
+    genai.configure(api_key=gemini_key)
+    with open("uploaded.pdf", "wb") as f:
+        f.write(uploaded_file.getbuffer())
+        
+    # Guardar PDF temporalmente para extraer imágenes
     with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-        temp_pdf.write(uploaded_file.read())
+        temp_pdf.write(uploaded_file.getbuffer())
         temp_pdf_path = temp_pdf.name
-    
-    st.write("Extrayendo imágenes...")
+
+    # EXTRAER IMÁGENES DEL PDF
     images_info = extract_images_from_pdf(temp_pdf_path)
-    
     if images_info:
-        df_images = create_image_database(images_info)
+        st.session_state.image_db = create_image_database(images_info)
+        # Limpia los archivos temporales de imagen
+        for img_info in images_info:
+            os.remove(img_info["path"])
+    os.remove(temp_pdf_path)
 
-        # Generar embeddings y almacenarlos
-        index, captions, embeddings = generate_embeddings(df_images)
-
-        # Sección de consulta con embeddings
+    # ------------------------- NUEVA SECCIÓN: BUSQUEDA SEMÁNTICA DE IMÁGENES -------------------------
+    if not st.session_state.image_db.empty:
         st.subheader("Búsqueda Semántica de Imágenes")
-        query_text = st.text_input("Escribe una descripción para buscar imágenes:")
+        # Generar embeddings para las imágenes usando el caption
+        image_model = SentenceTransformer("all-MiniLM-L6-v2")
+        image_captions = st.session_state.image_db["Caption"].tolist()
+        image_embeddings = image_model.encode(image_captions, convert_to_numpy=True)
+        d = image_embeddings.shape[1]
+        image_index = faiss.IndexFlatL2(d)
+        image_index.add(image_embeddings)
+        # Guardar en session_state para reutilizar si se desea
+        st.session_state.image_model = image_model
+        st.session_state.image_index = image_index
+        st.session_state.image_captions = image_captions
 
-        if query_text:
-            query_embedding = embedding_model.encode([query_text], convert_to_numpy=True)
-            D, I = index.search(query_embedding, k=1)  # Encuentra la más cercana
-            
-            closest_caption = captions[I[0][0]]
-            closest_url = df_images[df_images['Caption'] == closest_caption]['URL'].values[0]
-
+        query_img = st.text_input("Escribe una descripción para buscar imágenes:")
+        if query_img:
+            query_embedding = image_model.encode([query_img], convert_to_numpy=True)
+            distances, indices = image_index.search(query_embedding, k=1)
+            closest_caption = image_captions[indices[0][0]]
+            closest_url = st.session_state.image_db[st.session_state.image_db["Caption"] == closest_caption]["URL"].values[0]
             st.markdown(f"**Imagen más relevante:** {closest_caption}")
             st.markdown(f"![{closest_caption}]({closest_url})")
-        
-        st.subheader("Base de Datos Completa")
-        st.dataframe(df_images)
+    # -----------------------------------------------------------------------------------------------
 
-    else:
-        st.write("No se encontraron imágenes en el PDF.")
+    # Procesamiento de texto y generación de embeddings para el contenido del PDF
+    chunks = read_pdf_in_chunks("uploaded.pdf")
+    model, index = create_embeddings(chunks)
     
-    os.remove(temp_pdf_path)
+    question = None
+    try:
+        if 'audio_file' in locals() and audio_file:
+            languages = {"English": "en-US", "Spanish": "es-ES"}
+            question = transcribe_audio(audio_file, language=languages[option_language])
+    except Exception as e:
+        pass
+    try:
+        if 'text_question' in locals() and text_question:
+            question = text_question.strip()
+    except Exception as e:
+        pass
+
+    with text_box:
+        if question:
+            st.session_state.chat_history.append(("user", question))
+            context = search_context(model, index, chunks, question)
+            prompt = f"""
+            Your name is COOKIE, a medical device assistant that answers in the user's language naturally (and using emojis).
+            You are helping with the device described in the document.
+            
+            Relevant document context:
+            {context}
+            
+            Question:
+            {question}
+            
+            Provide a clear answer based on the document and indicate the section and pages (based on the document's table of content) where the user can find the information.
+            """
+            model_gen = genai.GenerativeModel("gemini-2.0-flash")
+            response = model_gen.generate_content(contents=prompt)
+            response_text = response.text
+
+            # Limpiar respuesta (remover emojis si se desea)
+            emoji_pattern = re.compile("[\U0001F600-\U0001F64F"
+                                       "\U0001F300-\U0001F5FF"
+                                       "\U0001F680-\U0001F6FF"
+                                       "\U0001F700-\U0001F77F"
+                                       "\U0001F780-\U0001F7FF"
+                                       "\U0001F800-\U0001F8FF"
+                                       "\U0001F900-\U0001F9FF"
+                                       "\U0001FA00-\U0001FA6F"
+                                       "\U0001FA70-\U0001FAFF"
+                                       "\U00002702-\U000027B0"
+                                       "\U000024C2-\U0001F251"
+                                       "]+", flags=re.UNICODE)
+            cleaned_response = emoji_pattern.sub('', response_text)
+            cleaned_response = cleaned_response.replace('*', ' ').replace(':', '\n')
+            audio_response = text_to_speech(cleaned_response, language={"English": "en-US", "Spanish": "es-ES"}[option_language])
+            
+            st.session_state.chat_history.append(("assistant", response_text, audio_response))
+            with st.chat_message("user"):
+                st.markdown(question)
+            with st.chat_message("assistant"):
+                st.markdown(response_text)
+                if st.session_state.COOKIE_voice:
+                    st.audio(audio_response, format='audio/mpeg', autoplay=True)
+                    b64 = base64.b64encode(audio_response.getvalue()).decode()
+                    href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+else:
+    st.info('You need to upload a GEMINI key and a document', icon="ℹ️")
 
