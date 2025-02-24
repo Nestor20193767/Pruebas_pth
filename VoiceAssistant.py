@@ -24,6 +24,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Languages
+languages = {"English": "en-US", "Spanish": "es-ES"}
+
 # --- Funciones de extracción de imágenes ---
 def extract_images_from_pdf(pdf_path):
     """Extrae imágenes de un PDF y las guarda en archivos temporales."""
