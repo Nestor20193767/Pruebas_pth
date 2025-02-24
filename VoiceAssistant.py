@@ -229,7 +229,7 @@ if gemini_key and uploaded_file:
             Relevant document context:
             {context}
             
-            Relevant images information:
+            Relevant images information (You must use the entry link do not complite with "..."):
             {st.session_state.image_db}
             
             Question:
