@@ -229,14 +229,15 @@ if gemini_key and uploaded_file:
             Relevant document context:
             {context}
             
-            Relevant images information (You must use the entry link do not complite with "..."):
+            Relevant images url information with each captions (You must use the entry link do not complite with "..."):
             {st.session_state.image_db}
             
             Question:
             {question}
             
             Provide a clear answer based on the document and indicate the section and pages (based on the document's table of content) where the user can find the information.
-            you can show the images if is necessary using this format: ![caption](url)
+            you can show the images if is necessary using this format: ![caption](url). expample of use:
+            ![Descripcion you want](url set in the infromation that i gave you depent of the caption)
             """
             
             model_gen = genai.GenerativeModel("gemini-2.0-flash")
