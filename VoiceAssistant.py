@@ -162,13 +162,14 @@ if gemini_key and uploaded_file:
 
             ai_model = genai.GenerativeModel("gemini-2.0-flash")
             response = ai_model.generate_content(contents=prompt)
-            response_text = response.text.replace('*', ' ').replace(':', '\n')
+            response_text = response.text
+            response_cleared = response.text.replace('*', ' ').replace(':', '\n') 
 
-            audio_response = text_to_speech(response_text, language=languages[option_language])
+            audio_response = text_to_speech(response_cleared, language=languages[option_language])
             st.session_state.chat_history.append(("assistant", response_text, audio_response))
 
             with st.chat_message("user"):
-                st.markdown(f"Hola mi bay ![Multix Impact]({multix_impact})")
+                #st.markdown(f"Hola mi bay ![Multix Impact]({multix_impact})")
                 st.markdown(question)
 
             with st.chat_message("assistant"):
