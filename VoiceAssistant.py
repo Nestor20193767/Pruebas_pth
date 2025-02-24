@@ -21,6 +21,7 @@ st.set_page_config(
 st.sidebar.title("Settings")
 gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
 uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
+multix_impact = "https://marketing.webassets.siemens-healthineers.com/d168e945589c1618/caf5d5af390f/v/f71be8b1483b/siemens-healthineers_XP_medical-Xray-machine_MULTIX-Impact-E.jpg"
 
 if "divi_voice" not in st.session_state:
     st.session_state.divi_voice = True
@@ -149,6 +150,7 @@ if gemini_key and uploaded_file:
 
             Provide a clear answer based on the document and say in which section and pages the user can find the information that you give them 
             based on the "table of content" in the document.
+            If the user ask you about how the device looks like you must show this image: {multix_impact}
             If the section contains images, mention them and use them in your response.
             """
 
