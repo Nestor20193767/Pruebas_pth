@@ -35,6 +35,8 @@ if "talk_to_COOKIE" not in st.session_state:
     st.session_state.talk_to_COOKIE = False
 if "image_db" not in st.session_state:
     st.session_state.image_db = pd.DataFrame()
+if "images_embedding_content" not in st.session_state:
+    st.session_state.images_embedding_content = {}  # Aquí se almacenarán los embeddings de las imágenes
 
 with st.sidebar:
     COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
@@ -46,7 +48,7 @@ st.title("🍪 COOKIE")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
 
-# Funciones para imágenes
+# ------------------ FUNCIONES DE IMÁGENES ------------------
 def extract_images_from_pdf(pdf_path):
     """Extrae imágenes de un PDF y las guarda en archivos temporales."""
     doc = fitz.open(pdf_path)
@@ -82,8 +84,9 @@ def create_image_database(images_info):
         img_url = get_base64_img(img_info["path"])
         database.append({"Caption": caption, "URL": img_url})
     return pd.DataFrame(database)
+# -----------------------------------------------------------
 
-# Funciones de audio y PDF (ya existentes en tu código)
+# ------------------ FUNCIONES DE AUDIO Y PDF ------------------
 def transcribe_audio(audio_file, language="en-US"):
     recognizer = sr.Recognizer()
     try:
@@ -126,6 +129,7 @@ def search_context(model, index, chunks, question, top_k=3):
     question_embedding = model.encode([question])
     distances, indices = index.search(np.array(question_embedding), top_k)
     return "\n\n".join(chunks[i] for i in indices[0])
+# -----------------------------------------------------------
 
 # Historial del chat
 if "chat_history" not in st.session_state:
@@ -164,21 +168,27 @@ if gemini_key and uploaded_file:
             os.remove(img_info["path"])
     os.remove(temp_pdf_path)
 
-    # ------------------------- NUEVA SECCIÓN: BUSQUEDA SEMÁNTICA DE IMÁGENES -------------------------
+    # ----------------- NUEVA SECCIÓN: EMBEDDINGS DE IMÁGENES -----------------
     if not st.session_state.image_db.empty:
         st.subheader("Búsqueda Semántica de Imágenes")
-        # Generar embeddings para las imágenes usando el caption
+        # Generar embeddings para los captions de las imágenes
         image_model = SentenceTransformer("all-MiniLM-L6-v2")
         image_captions = st.session_state.image_db["Caption"].tolist()
         image_embeddings = image_model.encode(image_captions, convert_to_numpy=True)
         d = image_embeddings.shape[1]
         image_index = faiss.IndexFlatL2(d)
         image_index.add(image_embeddings)
-        # Guardar en session_state para reutilizar si se desea
+        # Guardar en session_state para uso futuro
         st.session_state.image_model = image_model
         st.session_state.image_index = image_index
         st.session_state.image_captions = image_captions
-
+        # Guardar los embeddings y captions en una variable para incluirlos en el prompt
+        st.session_state.images_embedding_content = {
+            "captions": image_captions,
+            "embeddings": image_embeddings.tolist()
+        }
+        
+        # Sección para buscar imágenes
         query_img = st.text_input("Escribe una descripción para buscar imágenes:")
         if query_img:
             query_embedding = image_model.encode([query_img], convert_to_numpy=True)
@@ -187,7 +197,7 @@ if gemini_key and uploaded_file:
             closest_url = st.session_state.image_db[st.session_state.image_db["Caption"] == closest_caption]["URL"].values[0]
             st.markdown(f"**Imagen más relevante:** {closest_caption}")
             st.markdown(f"![{closest_caption}]({closest_url})")
-    # -----------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     # Procesamiento de texto y generación de embeddings para el contenido del PDF
     chunks = read_pdf_in_chunks("uploaded.pdf")
@@ -210,6 +220,10 @@ if gemini_key and uploaded_file:
         if question:
             st.session_state.chat_history.append(("user", question))
             context = search_context(model, index, chunks, question)
+            
+            # Incorporar en el prompt la información de imágenes guardada previamente
+            images_info_text = "\n".join(st.session_state.images_embedding_content["captions"])
+            
             prompt = f"""
             Your name is COOKIE, a medical device assistant that answers in the user's language naturally (and using emojis).
             You are helping with the device described in the document.
@@ -217,11 +231,15 @@ if gemini_key and uploaded_file:
             Relevant document context:
             {context}
             
+            Relevant images information:
+            {images_info_text}
+            
             Question:
             {question}
             
             Provide a clear answer based on the document and indicate the section and pages (based on the document's table of content) where the user can find the information.
             """
+            
             model_gen = genai.GenerativeModel("gemini-2.0-flash")
             response = model_gen.generate_content(contents=prompt)
             response_text = response.text
