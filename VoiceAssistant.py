@@ -239,6 +239,7 @@ if gemini_key and uploaded_file:
             {question}
             
             Provide a clear answer based on the document and indicate the section and pages (based on the document's table of content) where the user can find the information.
+            you can show the images if is necessary using this format: ![caption](url)
             """
             
             model_gen = genai.GenerativeModel("gemini-2.0-flash")
