@@ -1,17 +1,20 @@
 import os
-import fitz  # pymupdf
+import io
+import re
 import faiss
+import base64
 import PyPDF2
 import numpy as np
+from gtts import gTTS
 import streamlit as st
+import fitz  # PyMuPDF
+import pandas as pd
+import speech_recognition as sr
 import google.generativeai as genai
 from sentence_transformers import SentenceTransformer
-import speech_recognition as sr
-from gtts import gTTS
-import io
-import base64
-from PIL import Image
+from tempfile import NamedTemporaryFile
 
+# Configuración de la página
 st.set_page_config(
     page_title="COOKIE",
     page_icon="🍪",
@@ -19,67 +22,55 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.sidebar.title("Settings")
-gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
-uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
-multix_impact = "https://marketing.webassets.siemens-healthineers.com/d168e945589c1618/caf5d5af390f/v/f71be8b1483b/siemens-healthineers_XP_medical-Xray-machine_MULTIX-Impact-E.jpg"
+# --- Funciones de extracción de imágenes ---
+def extract_images_from_pdf(pdf_path):
+    """Extrae imágenes de un PDF y las guarda en archivos temporales."""
+    doc = fitz.open(pdf_path)
+    image_data = []
+    for page_num, page in enumerate(doc, start=1):
+        for img_index, img in enumerate(page.get_images(full=True), start=1):
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+            img_ext = base_image["ext"]
+            img_filename = f"extracted_image_{page_num}_{img_index}.{img_ext}"
+            
+            with open(img_filename, "wb") as img_file:
+                img_file.write(image_bytes)
+            
+            image_data.append({
+                "page": page_num,
+                "img_index": img_index,
+                "path": img_filename
+            })
+    return image_data
 
-if "COOKIE_voice" not in st.session_state:
-    st.session_state.COOKIE_voice = True
+def get_base64_img(img_path):
+    """Convierte una imagen a formato base64 para mostrarla en HTML."""
+    with open(img_path, "rb") as img_file:
+        b64 = base64.b64encode(img_file.read()).decode()
+    ext = img_path.split('.')[-1]
+    return f"data:image/{ext};base64,{b64}"
 
-if "talk_to_COOKIE" not in st.session_state:
-    st.session_state.talk_to_COOKIE = False
+def create_image_database(images_info):
+    """Crea un DataFrame con las imágenes extraídas."""
+    database = []
+    for img_info in images_info:
+        caption = f"Página {img_info['page']} - Imagen {img_info['img_index']}"
+        img_url = get_base64_img(img_info["path"])
+        database.append({"Caption": caption, "URL": img_url})
+    return pd.DataFrame(database)
 
-with st.sidebar:
-    COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
-    talk_to_COOKIE = st.checkbox("Talk to COOKIE", key="talk_to_COOKIE")
-    option_language = st.radio("COOKIE language", ["English", "Spanish"], key="English")
-
-st.title("🍪 COOKIE")
-st.subheader("Powered by GEMINI")
-st.write("### Ask a Question Based on the Document")
-
-
-if gemini_key and uploaded_file:
-    text_question = st.chat_input("Type your question...")
-
-    text_box = st.container(height=500)
-    
-    if st.session_state.talk_to_COOKIE:
-        audio_file = st.audio_input("Speak your question...")
-
-else:
-    st.info('You need to upload a GEMINI key and a document', icon="ℹ️")
-
-languages = {"English": "en-US", "Spanish": "es-ES"}
-
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = []
-
-def transcribe_audio(audio_file, language="en-US"):
-    recognizer = sr.Recognizer()
-    try:
-        with sr.AudioFile(audio_file) as source:
-            audio = recognizer.record(source)
-        text = recognizer.recognize_google(audio, language=language)
-        return text
-    except Exception:
-        return None
-
-def text_to_speech(text, language='en-US'):
-    tts = gTTS(text=text, lang=language)
-    audio_bytes = io.BytesIO()
-    tts.write_to_fp(audio_bytes)
-    audio_bytes.seek(0)
-    return audio_bytes
-
+# --- Funciones de procesamiento de texto ---
 def read_pdf_in_chunks(file_name, chunk_size=1000):
+    """Lee un PDF y lo divide en fragmentos de texto."""
     reader = PyPDF2.PdfReader(file_name)
     full_text = "".join(page.extract_text() or "" for page in reader.pages)
     return [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
 
 @st.cache_resource
 def create_embeddings(chunks):
+    """Crea embeddings para los fragmentos de texto."""
     model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
     embeddings = np.array([model.encode(chunk) for chunk in chunks])
     dimension = embeddings.shape[1]
@@ -88,104 +79,185 @@ def create_embeddings(chunks):
     return model, index
 
 def search_context(model, index, chunks, question, top_k=3):
+    """Busca los fragmentos más relevantes para una pregunta."""
     question_embedding = model.encode([question])
     distances, indices = index.search(np.array(question_embedding), top_k)
     return "\n\n".join(chunks[i] for i in indices[0])
 
-def extract_images_from_pdf(pdf_path, output_folder="extracted_images"):
-    os.makedirs(output_folder, exist_ok=True)
-    doc = fitz.open(pdf_path)
-    image_paths = {}
+# --- Funciones de audio ---
+def transcribe_audio(audio_file, language="en-US"):
+    """Transcribe un archivo de audio a texto."""
+    recognizer = sr.Recognizer()
+    try:
+        with sr.AudioFile(audio_file) as source:
+            audio = recognizer.record(source)
+        text = recognizer.recognize_google(audio, language=language)
+        return text
+    except sr.UnknownValueError:
+        st.error("Could not understand the audio")
+        return None
+    except sr.RequestError as e:
+        st.error(f"Speech recognition service error: {e}")
+        return None
 
-    for page_number in range(len(doc)):
-        page = doc[page_number]
-        images = page.get_images(full=True)
+def text_to_speech(text, language='en-US'):
+    """Convierte texto a audio."""
+    tts = gTTS(text=text, lang=language)
+    audio_bytes = io.BytesIO()
+    tts.write_to_fp(audio_bytes)
+    audio_bytes.seek(0)
+    return audio_bytes
+
+# --- Interfaz de usuario ---
+st.sidebar.title("Settings")
+gemini_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
+st.sidebar.markdown("[Get your GEMINI key](https://aistudio.google.com/app/apikey)")
+
+uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
+
+# Inicialización del estado de la sesión
+if "COOKIE_voice" not in st.session_state:
+    st.session_state.COOKIE_voice = True
+if "talk_to_COOKIE" not in st.session_state:
+    st.session_state.talk_to_COOKIE = False
+if "image_db" not in st.session_state:
+    st.session_state.image_db = pd.DataFrame()
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# Sidebar adicional
+with st.sidebar:
+    COOKIE_voice = st.checkbox("COOKIE voice", key="COOKIE_voice")
+    talk_to_COOKIE = st.checkbox("Talk to COOKIE", key="talk_to_COOKIE")
+    option_language = st.radio(
+        "COOKIE language",
+        ["English", "Spanish"],
+        key="language"
+    )
+
+# Título principal
+st.title("🍪 COOKIE")
+st.subheader("Powered by GEMINI")
+
+# Procesamiento del PDF
+if gemini_key and uploaded_file:
+    # Guardar PDF y procesar contenido
+    with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+        temp_pdf.write(uploaded_file.getbuffer())
+        temp_pdf_path = temp_pdf.name
+    
+    # Extraer imágenes
+    images_info = extract_images_from_pdf(temp_pdf_path)
+    if images_info:
+        st.session_state.image_db = create_image_database(images_info)
+        # Limpiar archivos temporales
+        for img_info in images_info:
+            os.remove(img_info["path"])
+    
+    # Procesar texto
+    chunks = read_pdf_in_chunks(temp_pdf_path)
+    model, index = create_embeddings(chunks)
+    os.remove(temp_pdf_path)
+
+# Sección de imágenes
+if not st.session_state.image_db.empty:
+    with st.expander("📸 Document Images Explorer", expanded=True):
+        col1, col2 = st.columns([1, 3])
         
-        for img_index, img in enumerate(images):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            ext = base_image["ext"]
-            image_filename = f"{output_folder}/page_{page_number + 1}_img_{img_index}.{ext}"
+        with col1:
+            selected_caption = st.selectbox(
+                "Select an image from the document:",
+                options=st.session_state.image_db['Caption'].tolist()
+            )
+        
+        with col2:
+            selected_url = st.session_state.image_db[
+                st.session_state.image_db['Caption'] == selected_caption
+            ]['URL'].values[0]
+            
+            st.markdown(f"**Selected Image:** {selected_caption}")
+            st.markdown(
+                f'<div style="text-align: center; margin: 20px;">'
+                f'<img src="{selected_url}" style="max-width: 100%; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
-            with open(image_filename, "wb") as img_file:
-                img_file.write(image_bytes)
-
-            if page_number + 1 not in image_paths:
-                image_paths[page_number + 1] = []
-            image_paths[page_number + 1].append(image_filename)
-
-    return image_paths
+# Chat principal
+st.write("### Ask a Question Based on the Document")
 
 if gemini_key and uploaded_file:
-    genai.configure(api_key=gemini_key)
+    # Input de texto o audio
+    if not st.session_state.talk_to_COOKIE:
+        text_question = st.chat_input("Type your question...")
+    else:
+        audio_file = st.audio_input("Speak your question...")
 
-    with open("uploaded.pdf", "wb") as f:
-        f.write(uploaded_file.getbuffer())
-
-    chunks = read_pdf_in_chunks("uploaded.pdf")
-    model, index = create_embeddings(chunks)
-    image_paths = extract_images_from_pdf("uploaded.pdf")
-
-    question = None
+    # Mostrar historial de chat
+    text_box = st.container(height=500)
     
+    try:
+        with text_box:
+            for role, message, *audio in st.session_state.chat_history:
+                with st.chat_message(role):
+                    st.markdown(message)
+                    if role == "assistant" and audio:
+                        st.audio(audio[0], format='audio/mpeg', autoplay=True)
+                        b64 = base64.b64encode(audio[0].getvalue()).decode()
+                        href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+    except Exception as e:
+        pass
+
+    # Procesar pregunta
+    question = None
     if audio_file:
         question = transcribe_audio(audio_file, language=languages[option_language])
-
-    if text_question:
+    elif text_question:
         question = text_question.strip()
 
-    with text_box:
-        if question:
-            st.session_state.chat_history.append(("user", question))
-            context = search_context(model, index, chunks, question)
+    if question:
+        # Guardar pregunta en el historial
+        st.session_state.chat_history.append(("user", question))
+        
+        # Buscar contexto y generar respuesta
+        context = search_context(model, index, chunks, question)
+        prompt = f"""
+        Your name is COOKIE, a medical device assistant that answers in the user's language and in a natural way (using emojis).
+        You are helping with the device described in the document.
+        
+        Relevant document context:
+        {context}
+        
+        Question:
+        {question}
+        
+        Provide a clear answer based on the document and mention the section and pages where the information can be found.
+        """
+        
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(contents=prompt)
+        response_text = response.text
 
-            prompt = f"""
-            Your name is COOKIE, a medical device assistant that answers in the user's language and in a natrual way (and using emojies).
-            You are helping with the device described in the document.
+        # Convertir respuesta a audio
+        cleaned_response = re.sub(r'[\U0001F600-\U0001F64F]+', '', response_text)  # Eliminar emojis
+        audio_response = text_to_speech(cleaned_response, language=languages[option_language])
 
-            Relevant document context:
-            {context}
+        # Guardar respuesta en el historial
+        st.session_state.chat_history.append(("assistant", response_text, audio_response))
 
-            Question:
-            {question}
-
-            Provide a clear answer based on the document and say in which section and pages the user can find the information that you give them 
-            based on the "table of content" in the document.
-            If the section contains images, mention them and use them in your response.
-            You can show images using links with this form: ![caption](link), here an example:
-            
-            ![Multix Impact]({multix_impact})
-
-            Also If the user ask you how the device looks like show this image: {multix_impact}
-            """
-
-            ai_model = genai.GenerativeModel("gemini-2.0-flash")
-            response = ai_model.generate_content(contents=prompt)
-            response_text = response.text
-            response_cleared = response.text.replace('*', ' ').replace(':', '\n') 
-
-            audio_response = text_to_speech(response_cleared, language=languages[option_language])
-            st.session_state.chat_history.append(("assistant", response_text, audio_response))
-
+        # Mostrar respuesta en la UI
+        with text_box:
             with st.chat_message("user"):
-                #st.markdown(f"Hola mi bay ![Multix Impact]({multix_impact})")
                 st.markdown(question)
-
             with st.chat_message("assistant"):
                 st.markdown(response_text)
-                
                 if st.session_state.COOKIE_voice:
                     st.audio(audio_response, format='audio/mpeg', autoplay=True)
                     b64 = base64.b64encode(audio_response.getvalue()).decode()
                     href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Download Response Audio</a>'
                     st.markdown(href, unsafe_allow_html=True)
 
-                # Mostrar imágenes relevantes si hay en la sección
-                for page_number, images in image_paths.items():
-                    if f"page {page_number}" in response_text.lower():
-                        st.write(f"📄 Relevant Images from Page {page_number}:")
-                        for img_path in images:
-                            img = Image.open(img_path)
-                            img = img.resize((img.width // 2, img.height // 2))  # Reduce size by 50%
-                            st.image(img, caption=f"Image from Page {page_number}")
+else:
+    st.info('You need to upload a GEMINI key and a document', icon="ℹ️")
