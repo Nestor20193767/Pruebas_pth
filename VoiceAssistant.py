@@ -265,7 +265,14 @@ if gemini_key and uploaded_file:
                 st.markdown(question)
             with st.chat_message("assistant"):
                 st.markdown(response_text)
-                st.markdown(st.session_state.image_db["Página 12 - Imagen 5"])
+                # Filtrar el DataFrame para obtener la fila con el caption deseado
+                df = st.session_state.image_db
+                fila_especifica = df[df['Caption'] == 'Página 12 - Imagen 5']
+                
+                # Obtener el URL de esa fila
+                url_especifico = fila_especifica['URL'].values[0]
+                st.markdown(f"![Hola](url_especifico)")
+
                 if st.session_state.COOKIE_voice:
                     st.audio(audio_response, format='audio/mpeg', autoplay=True)
                     b64 = base64.b64encode(audio_response.getvalue()).decode()
