@@ -14,7 +14,7 @@ from PIL import Image
 
 st.set_page_config(
     page_title="COOKIE",
-    page_icon="🤖",
+    page_icon="🍪",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -35,7 +35,7 @@ with st.sidebar:
     talk_to_COOKIE = st.checkbox("Talk to COOKIE", key="talk_to_COOKIE")
     option_language = st.radio("COOKIE language", ["English", "Spanish"], key="English")
 
-st.title("🤖 COOKIE")
+st.title("🍪 COOKIE")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
 
