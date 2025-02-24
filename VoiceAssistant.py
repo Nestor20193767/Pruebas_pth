@@ -265,6 +265,7 @@ if gemini_key and uploaded_file:
                 st.markdown(question)
             with st.chat_message("assistant"):
                 st.markdown(response_text)
+                st.markdown(st.session_state.image_db["Página 12 - Imagen 1"])
                 if st.session_state.COOKIE_voice:
                     st.audio(audio_response, format='audio/mpeg', autoplay=True)
                     b64 = base64.b64encode(audio_response.getvalue()).decode()
