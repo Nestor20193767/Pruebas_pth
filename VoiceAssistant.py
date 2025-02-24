@@ -151,7 +151,6 @@ if gemini_key and uploaded_file:
 
             Provide a clear answer based on the document and say in which section and pages the user can find the information that you give them 
             based on the "table of content" in the document.
-            If the user ask you about how the device looks like you must show this image: {multix_impact} using this format: ![Name of image](link)
             If the section contains images, mention them and use them in your response.
             """
 
