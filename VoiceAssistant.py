@@ -79,7 +79,7 @@ def create_image_database(images_info):
     """Crea un DataFrame con las imágenes extraídas."""
     database = []
     for img_info in images_info:
-        caption = f"Página {img_info['page']} - Imagen {img_info['img_index']}"
+        caption = f"Page {img_info['page']} - Image {img_info['img_index']}"
         img_url = get_base64_img(img_info["path"])
         database.append({"Caption": caption, "URL": img_url})
     return pd.DataFrame(database)
