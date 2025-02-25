@@ -262,6 +262,7 @@ if gemini_key and uploaded_file:
             audio_response = text_to_speech(cleaned_response, language={"English": "en-US", "Spanish": "es-ES"}[option_language])
             
             st.session_state.chat_history.append(("assistant", response_text, audio_response))
+            st.write(st.session_state.image_db)
             with st.chat_message("user"):
                 st.markdown(question)
             with st.chat_message("assistant"):
