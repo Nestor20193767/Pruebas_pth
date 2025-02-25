@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 from tempfile import NamedTemporaryFile
 
 st.set_page_config(
-    page_title="COOKIE",
+    page_title="COOKIE Beta",
     page_icon="🍪",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -43,7 +43,7 @@ with st.sidebar:
     option_language = st.radio("COOKIE language", ["English", "Spanish"], key="English")
     st.write(st.session_state.COOKIE_voice)
 
-st.title("🍪 COOKIE")
+st.title("🍪 COOKIE Beta")
 st.subheader("Powered by GEMINI")
 st.write("### Ask a Question Based on the Document")
 
