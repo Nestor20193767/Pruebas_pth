@@ -229,7 +229,7 @@ if gemini_key and uploaded_file:
             Relevant document context:
             {context}
             
-            Relevant images url information with each captions (You must use the entry link do not complite with "..."):
+            Relevant images url from the pages with each captions in this format Caption| URL (You must use the entry link do not complite with "..."):
             {st.session_state.image_db}
             
             Question:
