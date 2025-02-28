@@ -172,7 +172,7 @@ with tab4:
     # Entrada de audio con Streamlit
     audio_bytes = st.audio_input("Graba o sube un audio")
     
-    #if audio_bytes:
+    if audio_bytes:
         # Guardar el audio en un archivo temporal
         #with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
             #tmpfile.write(audio_bytes)
