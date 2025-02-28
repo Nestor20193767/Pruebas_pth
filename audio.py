@@ -172,18 +172,18 @@ with tab4:
     # Entrada de audio con Streamlit
     audio_bytes = st.audio_input("Graba o sube un audio")
     
-    if audio_bytes:
+    #if audio_bytes:
         # Guardar el audio en un archivo temporal
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
-            tmpfile.write(audio_bytes)
-            tmpfile_path = tmpfile.name
+        #with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
+            #tmpfile.write(audio_bytes)
+            #tmpfile_path = tmpfile.name
     
         # Leer y convertir el audio a formato compatible
         #data, samplerate = sf.read(tmpfile_path)
         #sf.write(tmpfile_path, data, samplerate)
     
         # Transcribir el audio
-        result = transcriber(tmpfile_path)
+        result = transcriber(audio_bytes)
     
         # Mostrar la transcripción
         st.subheader("Transcripción:")
