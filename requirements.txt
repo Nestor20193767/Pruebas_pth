@@ -15,3 +15,4 @@ faiss-cpu
 sentence-transformers 
 SpeechRecognition
 gTTS
+transformers
