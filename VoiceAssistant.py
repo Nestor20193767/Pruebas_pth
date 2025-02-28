@@ -167,7 +167,7 @@ if gemini_key and uploaded_file:
 
     # ----------------- EMBEDDINGS DE IMÁGENES Y ALMACENAMIENTO -----------------
     if not st.session_state.image_db.empty:
-        st.subheader("Búsqueda Semántica de Imágenes")
+        st.subheader("Semantic search of an Image")
         image_model = SentenceTransformer("all-MiniLM-L6-v2")
         image_captions = st.session_state.image_db["Caption"].tolist()
         image_embeddings = image_model.encode(image_captions, convert_to_numpy=True)
@@ -185,7 +185,7 @@ if gemini_key and uploaded_file:
         }
         
         # Entrada para búsqueda de imágenes
-        query_img = st.text_input("Escribe una descripción para buscar imágenes:")
+        query_img = st.text_input("Text a description for an image:")
         if query_img:
             query_embedding = image_model.encode([query_img], convert_to_numpy=True)
             distances, indices = image_index.search(query_embedding, k=1)
