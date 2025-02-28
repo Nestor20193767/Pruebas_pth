@@ -159,40 +159,36 @@ with tab3:
                 st.markdown(href, unsafe_allow_html=True)
 with tab4:
     import streamlit as st
-    from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+    from transformers import pipeline
     import tempfile
+    #import soundfile as sf
     
-    # Cargar modelo Whisper en CPU (por defecto)
-    model_id = "openai/whisper-large-v3-turbo"
-    model = AutoModelForSpeechSeq2Seq.from_pretrained(
-        model_id, low_cpu_mem_usage=True, use_safetensors=True
-    )
+    # Cargar el modelo de Whisper desde Hugging Face
+    transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-small", device="cpu")
     
-    processor = AutoProcessor.from_pretrained(model_id)
-    
-    pipe = pipeline(
-        "automatic-speech-recognition",
-        model=model,
-        tokenizer=processor.tokenizer,
-        feature_extractor=processor.feature_extractor,
-    )
-    
+    # Interfaz de Streamlit
     st.title("Transcripción de Audio con Whisper")
     
-    # Usar st.audio_input para grabar o subir audio (requiere versión actualizada de Streamlit)
-    audio_input = st.audio_input("Graba o sube tu audio:")
+    # Entrada de audio con Streamlit
+    audio_bytes = st.audio_input("Graba o sube un audio", type=["wav", "mp3", "ogg"])
     
-    if audio_input is not None:
+    if audio_bytes:
         # Guardar el audio en un archivo temporal
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(audio_input.getvalue())
-            audio_path = tmp_file.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
+            tmpfile.write(audio_bytes)
+            tmpfile_path = tmpfile.name
     
-        st.write("Transcribiendo...")
-        result = pipe(audio_path, return_timestamps=True)
+        # Leer y convertir el audio a formato compatible
+        #data, samplerate = sf.read(tmpfile_path)
+        #sf.write(tmpfile_path, data, samplerate)
     
-        st.subheader("Texto Transcrito:")
+        # Transcribir el audio
+        result = transcriber(tmpfile_path)
+    
+        # Mostrar la transcripción
+        st.subheader("Transcripción:")
         st.write(result["text"])
+
 
     
     
