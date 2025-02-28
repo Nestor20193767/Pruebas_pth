@@ -18,3 +18,4 @@ gTTS
 # Pruebas
 transformers
 safetensors
+soundfile 
