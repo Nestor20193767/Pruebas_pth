@@ -15,4 +15,6 @@ faiss-cpu
 sentence-transformers 
 SpeechRecognition
 gTTS
+# Pruebas
 transformers
+safetensors
