@@ -19,3 +19,4 @@ gTTS
 transformers
 safetensors
 soundfile 
+pydub
