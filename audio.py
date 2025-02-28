@@ -170,7 +170,7 @@ with tab4:
     st.title("Transcripción de Audio con Whisper")
     
     # Entrada de audio con Streamlit
-    audio_bytes = st.audio_input("Graba o sube un audio", type=["wav", "mp3", "ogg"])
+    audio_bytes = st.audio_input("Graba o sube un audio")
     
     if audio_bytes:
         # Guardar el audio en un archivo temporal
