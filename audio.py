@@ -53,7 +53,7 @@ def text_to_speech(text, language='en-US'):
     audio_bytes.seek(0)
     return audio_bytes
 
-tab1, tab2, tab3= st.tabs(["Speech-Text","text-Speech", "Speech Assistant"])
+tab1, tab2, tab3, tab4 = st.tabs(["Speech-Text","text-Speech", "Speech Assistant", "whisper"])
 
 with tab1:
     st.title("Record  y Transcript of Audio")
@@ -157,3 +157,42 @@ with tab3:
                 b64 = base64.b64encode(audio_response.getvalue()).decode()
                 href = f'<a href="data:audio/mpeg;base64,{b64}" download="response.mp3">Descargar audio respuesta</a>'
                 st.markdown(href, unsafe_allow_html=True)
+with tab4:
+    import streamlit as st
+    from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+    import tempfile
+    
+    # Cargar modelo Whisper en CPU (por defecto)
+    model_id = "openai/whisper-large-v3-turbo"
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(
+        model_id, low_cpu_mem_usage=True, use_safetensors=True
+    )
+    
+    processor = AutoProcessor.from_pretrained(model_id)
+    
+    pipe = pipeline(
+        "automatic-speech-recognition",
+        model=model,
+        tokenizer=processor.tokenizer,
+        feature_extractor=processor.feature_extractor,
+    )
+    
+    st.title("Transcripción de Audio con Whisper")
+    
+    # Usar st.audio_input para grabar o subir audio (requiere versión actualizada de Streamlit)
+    audio_input = st.audio_input("Graba o sube tu audio:")
+    
+    if audio_input is not None:
+        # Guardar el audio en un archivo temporal
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio_input.getvalue())
+            audio_path = tmp_file.name
+    
+        st.write("Transcribiendo...")
+        result = pipe(audio_path, return_timestamps=True)
+    
+        st.subheader("Texto Transcrito:")
+        st.write(result["text"])
+
+    
+    
