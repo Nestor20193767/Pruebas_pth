@@ -162,27 +162,31 @@ with tab4:
     from transformers import pipeline
     import io
     import soundfile as sf
+    from pydub import AudioSegment
     
-    # Cargar el modelo de Whisper desde Hugging Face
+    # Cargar el modelo de Whisper
     transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-small", device="cpu")
     
-    # Interfaz de Streamlit
     st.title("Transcripción de Audio con Whisper")
+    audio_file = st.audio_input("Graba o sube un audio")
     
-    # Entrada de audio con Streamlit
-    audio_bytes = st.audio_input("Graba o sube un audio")
+    if audio_file:
+        # Lee el contenido del archivo
+        audio_bytes = audio_file.read()
+        try:
+            # Intentar leer directamente (en caso de que el formato sea compatible)
+            data, samplerate = sf.read(io.BytesIO(audio_bytes))
+        except Exception as e:
+            # Si falla, se asume que el formato es MP3 y se convierte a WAV usando pydub
+            audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+            wav_io = io.BytesIO()
+            audio_segment.export(wav_io, format="wav")
+            wav_io.seek(0)
+            data, samplerate = sf.read(wav_io)
     
-    if audio_bytes:
-        # Convertir los bytes en un array de NumPy y obtener la frecuencia de muestreo
-        data, samplerate = sf.read(io.BytesIO(audio_bytes))
-        
-        # Es recomendable pasar tanto el array como la frecuencia de muestreo para que el modelo ajuste el audio correctamente
         result = transcriber({"array": data, "sampling_rate": samplerate})
-        
-        # Mostrar la transcripción
         st.subheader("Transcripción:")
         st.write(result["text"])
-
 
     
     
